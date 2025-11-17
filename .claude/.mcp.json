@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-github@1.2.3"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "git": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-git@1.0.0"],
+      "env": {}
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem@1.1.0", "."],
+      "env": {}
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-fetch@1.1.0"],
+      "env": {}
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-sqlite@1.0.0"],
+      "env": {}
+    },
+    "powerplatform": {
+      "command": "npx",
+      "args": ["powerplatform-mcp"],
+      "env": {
+        "POWERPLATFORM_URL": "${POWERPLATFORM_URL:-https://yourenv.crm.dynamics.com}",
+        "POWERPLATFORM_CLIENT_ID": "${POWERPLATFORM_CLIENT_ID}",
+        "POWERPLATFORM_CLIENT_SECRET": "${POWERPLATFORM_CLIENT_SECRET}",
+        "POWERPLATFORM_TENANT_ID": "${POWERPLATFORM_TENANT_ID}"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
+    }
+  }
+}
+

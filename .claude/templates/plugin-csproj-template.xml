@@ -1,0 +1,79 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AssemblyName>YourCompany.Dynamics.Plugins</AssemblyName>
+    <RootNamespace>YourCompany.Dynamics.Plugins</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <OutputType>Library</OutputType>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- Assembly Information -->
+  <PropertyGroup>
+    <Version>1.0.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Company>Your Company Name</Company>
+    <Product>Dynamics 365 Plugins</Product>
+    <Copyright>Copyright © Your Company 2025</Copyright>
+    <Description>Custom plugins for Dynamics 365</Description>
+  </PropertyGroup>
+
+  <!-- Strong Name Signing (Required for Dynamics 365 plugins) -->
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>YourKeyFile.snk</AssemblyOriginatorKeyFile>
+    <DelaySign>false</DelaySign>
+  </PropertyGroup>
+
+  <!-- NuGet Package References -->
+  <ItemGroup>
+    <!-- Core Dynamics 365 SDK -->
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.59" />
+
+    <!-- Optional: Workflow extensions if using custom workflow activities -->
+    <!-- <PackageReference Include="Microsoft.CrmSdk.Workflow" Version="9.0.2.59" /> -->
+
+    <!-- Optional: Modern client for advanced scenarios -->
+    <!-- <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.1.32" /> -->
+
+    <!-- Unit Testing Dependencies (only in test projects) -->
+    <!-- <PackageReference Include="Microsoft.CrmSdk.XrmTooling.CoreAssembly" Version="9.1.1.1" /> -->
+  </ItemGroup>
+
+  <!-- Build Configuration -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <!-- Code Analysis -->
+  <PropertyGroup>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>1701;1702</NoWarn>
+  </PropertyGroup>
+
+  <!-- Post-build event to copy assembly to Solutions folder (optional) -->
+  <!--
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /Y &quot;$(TargetPath)&quot; &quot;$(SolutionDir)Solutions\PluginAssemblies\&quot;" />
+  </Target>
+  -->
+
+</Project>

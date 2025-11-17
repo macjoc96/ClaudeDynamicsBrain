@@ -1,0 +1,171 @@
+{
+  "modelDefaults": {
+    "default": "sonnet",
+    "fastMode": "haiku",
+    "complexTasks": "sonnet"
+  },
+  "enabledMcpjsonServers": [
+    "github",
+    "git",
+    "filesystem",
+    "fetch",
+    "sqlite",
+    "brave-search",
+    "powerplatform"
+  ],
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:*)",
+      "WebSearch",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(del:*)"
+    ],
+    "ask": []
+  },
+  "subagents": {
+    "enableAutoDelegation": true,
+    "defaultModel": "sonnet"
+  },
+  "skills": {
+    "autoDiscovery": true,
+    "enabled": [
+      "dynamics-plugin-dev",
+      "power-automate-flows",
+      "custom-connector-builder",
+      "typescript-actions",
+      "lowcode-automation",
+      "yaml-configurations",
+      "dynamics-api-integration",
+      "solution-packaging",
+      "power-apps-code-apps"
+    ]
+  },
+  "commands": {
+    "autoDiscovery": true,
+    "enabled": [
+      "plugin-scaffold",
+      "flow-template",
+      "connector-stub",
+      "code-app-scaffold",
+      "solution-package",
+      "security-scan",
+      "api-reference",
+      "deploy-solution",
+      "test-setup"
+    ]
+  },
+  "codeQuality": {
+    "formatOnSave": true,
+    "lintOnSave": false,
+    "typeCheckEnabled": true
+  },
+  "documentation": {
+    "autoGenerate": true,
+    "includeExamples": true
+  },
+  "performance": {
+    "enableCaching": true,
+    "maxConcurrentOperations": 5
+  },
+  "security": {
+    "encryptSensitiveData": true,
+    "validateInputs": true,
+    "sanitizeOutput": true
+  },
+  "development": {
+    "debugMode": false,
+    "verboseLogging": false,
+    "enableTracing": true
+  },
+  "environment": {
+    "defaultEnvironment": "development",
+    "environments": {
+      "development": {
+        "name": "Development",
+        "description": "Local development environment"
+      },
+      "testing": {
+        "name": "Testing/UAT",
+        "description": "User acceptance testing environment"
+      },
+      "staging": {
+        "name": "Staging",
+        "description": "Pre-production staging environment"
+      },
+      "production": {
+        "name": "Production",
+        "description": "Live production environment"
+      }
+    }
+  },
+  "dynamicsConfiguration": {
+    "sdkPackage": "Microsoft.CrmSdk.CoreAssemblies",
+    "sdkVersion": "9.0.2.59",
+    "targetFramework": "net462",
+    "modernSdkPackage": "Microsoft.PowerPlatform.Dataverse.Client",
+    "modernSdkNote": "Use Microsoft.PowerPlatform.Dataverse.Client for .NET 6.0+ projects",
+    "enableEarlyBinding": true,
+    "cacheReferenceData": true,
+    "batchOperationSize": 2000,
+    "queryPageSize": 5000
+  },
+  "powerPlatformConfiguration": {
+    "connectorCacheTTL": 3600,
+    "flowTimeoutMinutes": 30,
+    "maxParallelActions": 10,
+    "retryPolicy": {
+      "enabled": true,
+      "maxRetries": 3,
+      "backoffMultiplier": 2
+    }
+  },
+  "testing": {
+    "csharp": {
+      "framework": "MSTest",
+      "coverageThreshold": 80,
+      "testProjects": ["**/*.Tests.csproj"]
+    },
+    "typescript": {
+      "framework": "Jest",
+      "coverageThreshold": 80,
+      "testMatch": ["**/*.test.ts", "**/*.spec.ts"],
+      "setupFiles": ["jest.setup.ts"]
+    },
+    "javascript": {
+      "framework": "Jest",
+      "coverageThreshold": 80,
+      "testMatch": ["**/*.test.js", "**/*.spec.js"]
+    },
+    "runBeforeCommit": false,
+    "includeIntegrationTests": true,
+    "parallelExecution": true,
+    "verboseOutput": false
+  },
+  "versionControl": {
+    "autoCommit": false,
+    "requireCommitMessage": true,
+    "includeSolutionXml": true
+  },
+  "notifications": {
+    "enableBuildNotifications": true,
+    "enableDeploymentNotifications": true,
+    "enableTestFailureNotifications": true
+  },
+  "integrations": {
+    "enableGitHub": true,
+    "enableAzureDevOps": true,
+    "enablePowerPlatform": true
+  }
+}

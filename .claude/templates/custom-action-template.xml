@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom Action Definition Template
+  This template defines a custom action for Dynamics 365
+  Replace [ActionName], [Description], etc. with your values
+-->
+<Action Name="[ActionName]" Description="[Action Description]">
+  <RequestParameters>
+    <!-- Define input parameters for the action -->
+    <Parameter Name="Target" Type="EntityReference" CLRType="Microsoft.Xrm.Sdk.EntityReference" Required="true" Description="The target entity for this action">
+      <EntitySet>
+        <!-- Specify which entities this parameter applies to -->
+        <Entity LogicalName="account" />
+        <Entity LogicalName="contact" />
+      </EntitySet>
+    </Parameter>
+
+    <!-- Example string parameter -->
+    <Parameter Name="Message" Type="String" CLRType="System.String" Required="true" Description="A message parameter" MaxLength="2000" />
+
+    <!-- Example boolean parameter -->
+    <Parameter Name="IsActive" Type="Boolean" CLRType="System.Boolean" Required="false" Description="Status flag" />
+
+    <!-- Example integer parameter -->
+    <Parameter Name="Count" Type="Integer" CLRType="System.Int32" Required="false" Description="Count of items" />
+  </RequestParameters>
+
+  <ResponseParameters>
+    <!-- Define output parameters returned by the action -->
+    <Parameter Name="Result" Type="String" CLRType="System.String" Description="Result message from the action" />
+
+    <Parameter Name="Status" Type="Integer" CLRType="System.Int32" Description="Status code: 1=Success, 0=Failure" />
+
+    <Parameter Name="ErrorMessage" Type="String" CLRType="System.String" Description="Error message if action fails" />
+  </ResponseParameters>
+
+  <ActionSteps>
+    <!-- Define the action steps (workflow steps) -->
+
+    <!-- Step 1: Create a record -->
+    <ActionStep Name="CreateRecord" StepType="CreateRecord">
+      <Description>Create a new account record</Description>
+      <RecordCreationSteps>
+        <RecordCreationStep EntityLogicalName="account">
+          <SetValues>
+            <SetValue AttributeName="name" Value="New Account" />
+            <SetValue AttributeName="description" Value="Account created by [ActionName] action" />
+          </SetValues>
+        </RecordCreationStep>
+      </RecordCreationSteps>
+    </ActionStep>
+
+    <!-- Step 2: Update a record -->
+    <ActionStep Name="UpdateRecord" StepType="UpdateRecord">
+      <Description>Update the target record</Description>
+      <SObjects>
+        <SObject Name="Target" Alias="target" />
+      </SObjects>
+      <SetValues>
+        <SetValue AttributeName="description" Value="Updated by [ActionName]" />
+      </SetValues>
+    </ActionStep>
+
+    <!-- Step 3: Conditional logic -->
+    <ActionStep Name="CheckCondition" StepType="ConditionalBranch">
+      <Description>Check if condition is met</Description>
+      <Conditions>
+        <Condition Operator="IsEqual">
+          <Parameter Name="IsActive" />
+          <Value Type="Boolean">true</Value>
+        </Condition>
+      </Conditions>
+      <IfTrueBranch>
+        <!-- Steps to execute if condition is true -->
+      </IfTrueBranch>
+      <IfFalseBranch>
+        <!-- Steps to execute if condition is false -->
+      </IfFalseBranch>
+    </ActionStep>
+
+    <!-- Step 4: Query records -->
+    <ActionStep Name="QueryRecords" StepType="QueryRecords">
+      <Description>Query related records</Description>
+      <EntityLogicalName>accountcontacts</EntityLogicalName>
+      <FilterExpression>
+        <Condition EntityLogicalName="contact" AttributeName="statecode" Operator="Equal">
+          <Value Type="Integer">0</Value>
+        </Condition>
+      </FilterExpression>
+    </ActionStep>
+
+    <!-- Step 5: Loop through records -->
+    <ActionStep Name="ApplyEachRecord" StepType="ApplyEachRecord">
+      <Description>Process each returned record</Description>
+      <RecordSet Name="QueryRecords" />
+      <Actions>
+        <!-- Actions to perform on each record -->
+      </Actions>
+    </ActionStep>
+
+    <!-- Step 6: Assign value -->
+    <ActionStep Name="AssignValue" StepType="AssignValue">
+      <Description>Set the output parameter</Description>
+      <AssignTo>Result</AssignTo>
+      <Value>Action executed successfully</Value>
+    </ActionStep>
+
+  </ActionSteps>
+
+  <Privileges>
+    <!-- Define required privileges for this action -->
+    <Privilege Entity="account" Privilege="prvCreateAccount" />
+    <Privilege Entity="contact" Privilege="prvReadContact" />
+  </Privileges>
+
+  <SdkMessage Name="[ActionName]" RequestName="[ActionName]Request" ResponseName="[ActionName]Response" IsPrivate="false" IsComposite="false">
+    <!-- SDK Message binding configuration -->
+  </SdkMessage>
+
+</Action>

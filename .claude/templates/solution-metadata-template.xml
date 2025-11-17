@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml version="9.2.0.0" SolutionPackageVersion="9.2" languagecode="1033" generatedBy="CrmLive" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SolutionManifest>
+    <!-- Unique name of the solution -->
+    <UniqueName>YourSolutionName</UniqueName>
+
+    <!-- Display name shown in Power Platform admin center -->
+    <LocalizedNames>
+      <LocalizedName description="Your Solution Display Name" languagecode="1033" />
+    </LocalizedNames>
+
+    <!-- Description of the solution -->
+    <Descriptions>
+      <Description description="Description of your solution and its purpose" languagecode="1033" />
+    </Descriptions>
+
+    <!-- Version number (use semantic versioning: major.minor.patch.build) -->
+    <Version>1.0.0.0</Version>
+
+    <!-- Solution type: Managed or Unmanaged -->
+    <!-- Managed: Cannot be modified after import (for production) -->
+    <!-- Unmanaged: Can be modified after import (for development) -->
+    <Managed>0</Managed>
+
+    <!-- Publisher information -->
+    <Publisher>
+      <UniqueName>YourPublisher</UniqueName>
+      <LocalizedNames>
+        <LocalizedName description="Your Organization Name" languagecode="1033" />
+      </LocalizedNames>
+      <Descriptions>
+        <Description description="Publisher description" languagecode="1033" />
+      </Descriptions>
+      <EMailAddress>contact@yourorg.com</EMailAddress>
+      <SupportingWebsiteUrl>https://www.yourorg.com</SupportingWebsiteUrl>
+      <!-- Customization prefix (3-8 characters, typically your org abbreviation) -->
+      <CustomizationPrefix>prefix</CustomizationPrefix>
+      <!-- Customization option value prefix (10000-99999) -->
+      <CustomizationOptionValuePrefix>10000</CustomizationOptionValuePrefix>
+      <Addresses>
+        <Address>
+          <AddressNumber>1</AddressNumber>
+          <AddressTypeCode>1</AddressTypeCode>
+          <City>Your City</City>
+          <County>Your County</County>
+          <Country>Your Country</Country>
+          <Line1>Address Line 1</Line1>
+          <PostalCode>12345</PostalCode>
+          <StateOrProvince>Your State</StateOrProvince>
+        </Address>
+      </Addresses>
+    </Publisher>
+
+    <!-- Root components included in this solution -->
+    <RootComponents>
+      <!-- Example: Plugin Assembly -->
+      <!--
+      <RootComponent type="91" schemaName="YourPluginAssembly" behavior="0" />
+      -->
+
+      <!-- Example: Custom Entity -->
+      <!--
+      <RootComponent type="1" schemaName="prefix_customentity" behavior="0" />
+      -->
+
+      <!-- Example: Workflow (Cloud Flow) -->
+      <!--
+      <RootComponent type="29" id="{workflow-guid}" behavior="0" />
+      -->
+
+      <!-- Example: Web Resource -->
+      <!--
+      <RootComponent type="61" schemaName="prefix_/scripts/custom.js" behavior="0" />
+      -->
+
+      <!-- Example: Site Map -->
+      <!--
+      <RootComponent type="62" id="{sitemap-guid}" behavior="0" />
+      -->
+    </RootComponents>
+
+    <!-- Missing dependencies configuration -->
+    <MissingDependencies />
+
+  </SolutionManifest>
+</ImportExportXml>

@@ -1,0 +1,126 @@
+# Dynamics 365 / Power Platform .gitignore template
+
+# Build outputs
+bin/
+obj/
+out/
+dist/
+build/
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.vscode/
+*.code-workspace
+
+# MSTest test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+.nuget/
+project.lock.json
+project.fragment.lock.json
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.yarn/
+package-lock.json
+yarn.lock
+
+# TypeScript
+*.tsbuildinfo
+dist-ssr/
+
+# Power Platform
+*.zip
+*.pak
+Solutions/*/bin/
+Solutions/*/obj/
+
+# Dynamics 365 exports
+*.xml.data.xml
+customizations.xml.bak
+
+# Sensitive files
+.env
+.env.local
+.env.production
+.env.*.local
+*.pfx
+*.key
+secrets.json
+appsettings.Development.json
+ServiceConfiguration.Local.cscfg
+
+# Power Apps Code Apps
+.vite/
+vite.config.ts.timestamp-*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.bak
+*.cache
+
+# Coverage reports
+coverage/
+*.lcov
+htmlcov/
+
+# Azure DevOps
+.artifacts/
+.taskkey
+
+# Solution customizations that should not be committed
+# (Uncomment if you don't want to track certain customizations)
+# SolutionPackage/src/WebResources/
+# SolutionPackage/src/PluginAssemblies/
+
+# Plugin registration tool
+PluginRegistration.log
+
+# Personal settings (keep these local)
+.claude/settings.local.json
+.claude/mcp.local.json
+
+# Credentials (never commit these!)
+*.credentials
+**/appsettings.*.json
+!**/appsettings.json
+config.local.*
