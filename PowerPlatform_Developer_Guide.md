@@ -3424,3 +3424,1549 @@ W **Rozdziale 2** poznasz **TypeScript/JavaScript dla Power Platform** - język 
 
 ---
 
+
+# Rozdział 2: TypeScript/JavaScript dla Power Platform
+
+## Wprowadzenie
+
+JavaScript i TypeScript są fundamentalnymi językami dla rozwoju client-side w ekosystemie Power Platform. Używane są do:
+- **Form scripts** - customizacja formularzy w Model-Driven Apps  
+- **Web Resources** - custom HTML/CSS/JS zasoby
+- **Power Apps Code Apps** - pełne aplikacje React + TypeScript
+- **Custom Pages** - rozszerzanie Canvas Apps
+- **Power Automate** - custom actions i connectors
+
+### Czego się nauczysz?
+
+W tym rozdziale poznasz:
+- TypeScript jako nadzbiór JavaScript z silnym typowaniem
+- Nowoczesne ES6+ features używane w Power Platform
+- Asynchroniczne programowanie z Promises i async/await
+- Manipulację DOM dla form scripts
+- Interfaces i type safety dla Dynamics entities
+
+### Dlaczego TypeScript w Power Platform?
+
+TypeScript oferuje znaczące korzyści nad czystym JavaScript:
+- **Type Safety** - błędy wyłapane podczas kompilacji, nie w runtime
+- **IntelliSense** - lepsze autocomplete w VS Code
+- **Refactoring** - bezpieczniejsze zmiany w kodzie
+- **Dokumentacja** - typy służą jako dokumentacja
+- **Ekosystem** - pełne wsparcie dla React, modern frameworks
+
+> 💡 **TIP**: Microsoft oficjalnie rekomenduje TypeScript dla Power Apps Code Apps i wszystkich nowych projektów JavaScript.
+
+---
+
+## 2.1 Podstawy TypeScript
+
+### TypeScript vs JavaScript
+
+TypeScript to "superset" JavaScript - każdy poprawny kod JavaScript jest poprawnym kodem TypeScript, ale nie na odwrót.
+
+[Treść rozdziału 2 będzie kontynuowana w następnym commicie...]
+
+---
+
+
+## 2.3 Promises i Async/Await
+
+Asynchroniczne programowanie jest fundamentem współczesnych aplikacji webowych. W Power Platform używamy promises i async/await do:
+- Wywołań Web API (fetch)
+- Operacji na bazie danych (Dataverse)
+- External API calls
+- File operations
+
+### Promises - podstawy
+
+Promise reprezentuje wartość która może być dostępna teraz, w przyszłości, lub nigdy.
+
+```typescript
+// Tworzenie Promise
+const myPromise = new Promise<string>((resolve, reject) => {
+    // Asynchroniczna operacja
+    setTimeout(() => {
+        const success = true;
+        
+        if (success) {
+            resolve("Operation successful!");
+        } else {
+            reject(new Error("Operation failed"));
+        }
+    }, 1000);
+});
+
+// Użycie Promise z then/catch
+myPromise
+    .then(result => {
+        console.log(result); // "Operation successful!"
+    })
+    .catch(error => {
+        console.error(error);
+    })
+    .finally(() => {
+        console.log("Operation completed");
+    });
+
+// Promise states
+// - Pending: initial state
+// - Fulfilled: operation completed successfully  
+// - Rejected: operation failed
+
+// Promise chaining
+fetch("/api/data/v9.2/accounts")
+    .then(response => response.json())
+    .then(data => {
+        console.log("Accounts:", data.value);
+        return data.value.length;
+    })
+    .then(count => {
+        console.log(`Found ${count} accounts`);
+    })
+    .catch(error => {
+        console.error("Error:", error);
+    });
+```
+
+### Async/Await syntax
+
+Async/await to syntactic sugar nad Promises - czytelniejszy i łatwiejszy w maintainability.
+
+```typescript
+// Function returning Promise (old way)
+function fetchAccountsOld(): Promise<any[]> {
+    return fetch("/api/data/v9.2/accounts")
+        .then(response => response.json())
+        .then(data => data.value);
+}
+
+// Async function (modern way)
+async function fetchAccounts(): Promise<any[]> {
+    const response = await fetch("/api/data/v9.2/accounts");
+    const data = await response.json();
+    return data.value;
+}
+
+// Error handling with try/catch
+async function fetchAccountsSafe(): Promise<any[]> {
+    try {
+        const response = await fetch("/api/data/v9.2/accounts");
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.value;
+    } catch (error) {
+        console.error("Failed to fetch accounts:", error);
+        return []; // Return empty array on error
+    }
+}
+
+// Sequential async operations
+async function createAccountWithContact(
+    accountName: string,
+    contactName: string
+): Promise<void> {
+    // First create account
+    const accountResponse = await fetch("/api/data/v9.2/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: accountName })
+    });
+    
+    const accountId = accountResponse.headers.get("OData-EntityId");
+    
+    // Then create contact linked to account
+    await fetch("/api/data/v9.2/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            firstname: contactName,
+            "parentcustomerid_account@odata.bind": accountId
+        })
+    });
+}
+
+// Parallel async operations with Promise.all
+async function fetchMultipleEntities(): Promise<any> {
+    const [accounts, contacts, opportunities] = await Promise.all([
+        fetch("/api/data/v9.2/accounts").then(r => r.json()),
+        fetch("/api/data/v9.2/contacts").then(r => r.json()),
+        fetch("/api/data/v9.2/opportunities").then(r => r.json())
+    ]);
+    
+    return {
+        accounts: accounts.value,
+        contacts: contacts.value,
+        opportunities: opportunities.value
+    };
+}
+
+// Promise.race - first to complete wins
+async function fetchWithTimeout(
+    url: string,
+    timeoutMs: number
+): Promise<Response> {
+    const fetchPromise = fetch(url);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Request timeout")), timeoutMs);
+    });
+    
+    return Promise.race([fetchPromise, timeoutPromise]);
+}
+```
+
+### Praktyczne przykłady dla Dynamics 365
+
+```typescript
+// ============================================================================
+// WEB API OPERATIONS
+// ============================================================================
+
+class DynamicsWebAPI {
+    private readonly baseUrl = "/api/data/v9.2";
+    private readonly headers = {
+        "OData-MaxVersion": "4.0",
+        "OData-Version": "4.0",
+        "Content-Type": "application/json"
+    };
+
+    // Create entity
+    async create(entitySetName: string, entity: any): Promise<string> {
+        const response = await fetch(`${this.baseUrl}/${entitySetName}`, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify(entity)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error.message);
+        }
+
+        // Extract ID from response header
+        const entityUrl = response.headers.get("OData-EntityId");
+        const id = entityUrl?.match(/\(([^)]+)\)/)?.[1];
+        
+        if (!id) {
+            throw new Error("Failed to extract entity ID");
+        }
+
+        return id;
+    }
+
+    // Retrieve entity
+    async retrieve(
+        entitySetName: string,
+        id: string,
+        select?: string[]
+    ): Promise<any> {
+        let url = `${this.baseUrl}/${entitySetName}(${id})`;
+        
+        if (select && select.length > 0) {
+            url += `?$select=${select.join(",")}`;
+        }
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: this.headers
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to retrieve entity: ${response.statusText}`);
+        }
+
+        return response.json();
+    }
+
+    // Update entity
+    async update(
+        entitySetName: string,
+        id: string,
+        entity: any
+    ): Promise<void> {
+        const response = await fetch(`${this.baseUrl}/${entitySetName}(${id})`, {
+            method: "PATCH",
+            headers: this.headers,
+            body: JSON.stringify(entity)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error.message);
+        }
+    }
+
+    // Delete entity
+    async delete(entitySetName: string, id: string): Promise<void> {
+        const response = await fetch(`${this.baseUrl}/${entitySetName}(${id})`, {
+            method: "DELETE",
+            headers: this.headers
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete entity: ${response.statusText}`);
+        }
+    }
+
+    // Retrieve multiple with query
+    async retrieveMultiple(
+        entitySetName: string,
+        query?: {
+            select?: string[];
+            filter?: string;
+            orderby?: string;
+            top?: number;
+        }
+    ): Promise<any[]> {
+        const params: string[] = [];
+
+        if (query?.select) {
+            params.push(`$select=${query.select.join(",")}`);
+        }
+
+        if (query?.filter) {
+            params.push(`$filter=${query.filter}`);
+        }
+
+        if (query?.orderby) {
+            params.push(`$orderby=${query.orderby}`);
+        }
+
+        if (query?.top) {
+            params.push(`$top=${query.top}`);
+        }
+
+        const queryString = params.length > 0 ? `?${params.join("&")}` : "";
+        const url = `${this.baseUrl}/${entitySetName}${queryString}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: this.headers
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to retrieve entities: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.value;
+    }
+}
+
+// Usage example
+const api = new DynamicsWebAPI();
+
+async function exampleUsage(): Promise<void> {
+    try {
+        // Create account
+        const accountId = await api.create("accounts", {
+            name: "Contoso Ltd",
+            revenue: 1000000,
+            numberofemployees: 250
+        });
+
+        console.log(`Account created: ${accountId}`);
+
+        // Retrieve account
+        const account = await api.retrieve("accounts", accountId, [
+            "name",
+            "revenue",
+            "numberofemployees"
+        ]);
+
+        console.log("Account data:", account);
+
+        // Update account
+        await api.update("accounts", accountId, {
+            revenue: 2000000
+        });
+
+        console.log("Account updated");
+
+        // Query accounts
+        const highRevenueAccounts = await api.retrieveMultiple("accounts", {
+            filter: "revenue gt 1000000",
+            select: ["name", "revenue"],
+            orderby: "revenue desc",
+            top: 10
+        });
+
+        console.log("High revenue accounts:", highRevenueAccounts);
+
+    } catch (error) {
+        console.error("Operation failed:", error);
+    }
+}
+
+// ============================================================================
+// FORM SCRIPT WITH ASYNC OPERATIONS
+// ============================================================================
+
+class AccountForm {
+    private formContext: any;
+
+    constructor(executionContext: any) {
+        this.formContext = executionContext.getFormContext();
+    }
+
+    async onLoad(): Promise<void> {
+        try {
+            const accountId = this.formContext.data.entity.getId();
+            
+            if (accountId) {
+                // Load related contacts in parallel
+                const [contacts, opportunities] = await Promise.all([
+                    this.loadRelatedContacts(accountId),
+                    this.loadRelatedOpportunities(accountId)
+                ]);
+
+                this.displayRelatedData(contacts, opportunities);
+            }
+
+            // Setup change handlers
+            this.setupChangeHandlers();
+
+        } catch (error) {
+            console.error("Error loading form:", error);
+            this.showNotification("Error loading form data", "ERROR");
+        }
+    }
+
+    private async loadRelatedContacts(accountId: string): Promise<any[]> {
+        const api = new DynamicsWebAPI();
+        return api.retrieveMultiple("contacts", {
+            filter: `_parentcustomerid_value eq ${accountId}`,
+            select: ["fullname", "emailaddress1", "telephone1"],
+            orderby: "fullname asc"
+        });
+    }
+
+    private async loadRelatedOpportunities(accountId: string): Promise<any[]> {
+        const api = new DynamicsWebAPI();
+        return api.retrieveMultiple("opportunities", {
+            filter: `_customerid_value eq ${accountId}`,
+            select: ["name", "estimatedvalue", "closeprobability"],
+            orderby: "estimatedvalue desc"
+        });
+    }
+
+    private displayRelatedData(contacts: any[], opportunities: any[]): void {
+        // Update UI with related data
+        const contactsControl = this.formContext.getControl("contacts_subgrid");
+        const oppsControl = this.formContext.getControl("opportunities_subgrid");
+
+        if (contactsControl) {
+            contactsControl.refresh();
+        }
+
+        if (oppsControl) {
+            oppsControl.refresh();
+        }
+
+        // Show summary notification
+        this.showNotification(
+            `Loaded ${contacts.length} contacts and ${opportunities.length} opportunities`,
+            "INFO"
+        );
+    }
+
+    private setupChangeHandlers(): void {
+        const revenueAttr = this.formContext.getAttribute("revenue");
+        
+        if (revenueAttr) {
+            revenueAttr.addOnChange(async () => {
+                await this.onRevenueChange();
+            });
+        }
+    }
+
+    private async onRevenueChange(): Promise<void> {
+        const revenue = this.formContext.getAttribute("revenue")?.getValue();
+        
+        if (revenue > 1000000) {
+            // Call external API to verify large revenue
+            try {
+                const isValid = await this.verifyLargeRevenue(revenue);
+                
+                if (!isValid) {
+                    this.showNotification(
+                        "Large revenue amount requires additional verification",
+                        "WARNING"
+                    );
+                }
+            } catch (error) {
+                console.error("Revenue verification failed:", error);
+            }
+        }
+    }
+
+    private async verifyLargeRevenue(amount: number): Promise<boolean> {
+        // Simulate external API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return true;
+    }
+
+    private showNotification(message: string, level: string): void {
+        this.formContext.ui.setFormNotification(
+            message,
+            level,
+            `notification_${Date.now()}`
+        );
+    }
+}
+
+// Register handlers
+function onFormLoad(executionContext: any): void {
+    const form = new AccountForm(executionContext);
+    form.onLoad();
+}
+```
+
+### Error handling patterns
+
+```typescript
+// ============================================================================
+// RETRY PATTERN
+// ============================================================================
+
+async function retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delayMs: number = 1000
+): Promise<T> {
+    let lastError: Error;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error as Error;
+            console.warn(`Attempt ${attempt} failed:`, error);
+
+            if (attempt < maxRetries) {
+                // Exponential backoff
+                const delay = delayMs * Math.pow(2, attempt - 1);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    throw new Error(`Operation failed after ${maxRetries} attempts: ${lastError.message}`);
+}
+
+// Usage
+async function fetchWithRetry(): Promise<any> {
+    return retryOperation(
+        () => fetch("/api/data/v9.2/accounts").then(r => r.json()),
+        3,
+        1000
+    );
+}
+
+// ============================================================================
+// TIMEOUT PATTERN
+// ============================================================================
+
+async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number
+): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+            reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
+
+    return Promise.race([promise, timeout]);
+}
+
+// Usage
+async function fetchWithTimeout(): Promise<any> {
+    const fetchPromise = fetch("/api/data/v9.2/accounts").then(r => r.json());
+    return withTimeout(fetchPromise, 5000); // 5 second timeout
+}
+
+// ============================================================================
+// CIRCUIT BREAKER PATTERN
+// ============================================================================
+
+class CircuitBreaker {
+    private failures: number = 0;
+    private lastFailureTime: number = 0;
+    private state: "CLOSED" | "OPEN" | "HALF_OPEN" = "CLOSED";
+
+    constructor(
+        private threshold: number = 5,
+        private timeout: number = 60000
+    ) {}
+
+    async execute<T>(operation: () => Promise<T>): Promise<T> {
+        if (this.state === "OPEN") {
+            if (Date.now() - this.lastFailureTime > this.timeout) {
+                this.state = "HALF_OPEN";
+            } else {
+                throw new Error("Circuit breaker is OPEN");
+            }
+        }
+
+        try {
+            const result = await operation();
+            this.onSuccess();
+            return result;
+        } catch (error) {
+            this.onFailure();
+            throw error;
+        }
+    }
+
+    private onSuccess(): void {
+        this.failures = 0;
+        this.state = "CLOSED";
+    }
+
+    private onFailure(): void {
+        this.failures++;
+        this.lastFailureTime = Date.now();
+
+        if (this.failures >= this.threshold) {
+            this.state = "OPEN";
+        }
+    }
+}
+
+// Usage
+const breaker = new CircuitBreaker(5, 60000);
+
+async function fetchWithCircuitBreaker(): Promise<any> {
+    return breaker.execute(() =>
+        fetch("/api/data/v9.2/accounts").then(r => r.json())
+    );
+}
+```
+
+---
+
+## 2.4 DOM Manipulation
+
+W Dynamics 365 używamy DOM manipulation głównie w web resources i custom pages. Znajomość DOM API jest kluczowa dla customizacji interfejsu.
+
+### QuerySelector i event listeners
+
+```typescript
+// ============================================================================
+// QUERY SELECTORS
+// ============================================================================
+
+// getElementById - najszybsze, ale wymaga unique ID
+const nameField = document.getElementById("account_name");
+
+// querySelector - pierwszy matching element
+const firstButton = document.querySelector("button.save-btn");
+const firstInput = document.querySelector('input[type="text"]');
+
+// querySelectorAll - wszystkie matching elements (NodeList)
+const allButtons = document.querySelectorAll("button");
+const allInputs = document.querySelectorAll('input[type="text"]');
+
+// Iteracja przez NodeList
+allButtons.forEach(button => {
+    console.log(button.textContent);
+});
+
+// Convert NodeList to Array dla advanced operations
+const buttonsArray = Array.from(allButtons);
+const activeButtons = buttonsArray.filter(btn => !btn.disabled);
+
+// ============================================================================
+// EVENT LISTENERS
+// ============================================================================
+
+// Basic event listener
+const saveButton = document.getElementById("saveButton");
+saveButton?.addEventListener("click", (event) => {
+    console.log("Save clicked");
+    event.preventDefault(); // Prevent default action
+});
+
+// Event listener with options
+saveButton?.addEventListener("click", handleSave, {
+    once: true,      // Remove after first call
+    passive: true,   // Never calls preventDefault
+    capture: false   // Bubbling phase
+});
+
+function handleSave(event: Event): void {
+    const target = event.target as HTMLButtonElement;
+    console.log("Button clicked:", target.textContent);
+}
+
+// Remove event listener
+saveButton?.removeEventListener("click", handleSave);
+
+// Multiple event types
+const input = document.getElementById("nameInput") as HTMLInputElement;
+
+input?.addEventListener("focus", () => {
+    console.log("Input focused");
+});
+
+input?.addEventListener("blur", () => {
+    console.log("Input blurred");
+});
+
+input?.addEventListener("input", (event) => {
+    const target = event.target as HTMLInputElement;
+    console.log("Input value:", target.value);
+});
+
+input?.addEventListener("change", (event) => {
+    const target = event.target as HTMLInputElement;
+    console.log("Input changed:", target.value);
+});
+
+// ============================================================================
+// EVENT DELEGATION
+// ============================================================================
+
+// Instead of adding listener to each button
+const container = document.getElementById("buttonsContainer");
+
+container?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    
+    // Check if clicked element is a button
+    if (target.tagName === "BUTTON") {
+        console.log("Button clicked:", target.textContent);
+    }
+});
+
+// Practical example for dynamic lists
+const accountList = document.getElementById("accountList");
+
+accountList?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    
+    // Find closest account item
+    const accountItem = target.closest(".account-item");
+    
+    if (accountItem) {
+        const accountId = accountItem.getAttribute("data-account-id");
+        console.log("Account selected:", accountId);
+    }
+});
+```
+
+### Element creation i modification
+
+```typescript
+// ============================================================================
+// CREATING ELEMENTS
+// ============================================================================
+
+// Create element
+const div = document.createElement("div");
+div.className = "account-card";
+div.id = "account-123";
+
+// Set attributes
+div.setAttribute("data-account-id", "123");
+div.setAttribute("data-category", "enterprise");
+
+// Add text content
+div.textContent = "Contoso Ltd";
+
+// Add HTML content
+div.innerHTML = `
+    <h3>Contoso Ltd</h3>
+    <p>Revenue: $1,000,000</p>
+`;
+
+// Create text node
+const textNode = document.createTextNode("Hello, World!");
+
+// Append to DOM
+const container = document.getElementById("accountsContainer");
+container?.appendChild(div);
+
+// Insert before
+const firstChild = container?.firstChild;
+container?.insertBefore(div, firstChild);
+
+// Remove element
+div.remove();
+
+// Or using parent
+container?.removeChild(div);
+
+// ============================================================================
+// MODIFYING ELEMENTS
+// ============================================================================
+
+// Change text
+const heading = document.getElementById("pageTitle");
+if (heading) {
+    heading.textContent = "Account Details";
+    heading.innerHTML = "<strong>Account Details</strong>";
+}
+
+// Change attributes
+const image = document.getElementById("logo") as HTMLImageElement;
+if (image) {
+    image.src = "/images/new-logo.png";
+    image.alt = "Company Logo";
+}
+
+// Add/remove classes
+const button = document.getElementById("saveBtn");
+if (button) {
+    button.classList.add("primary");
+    button.classList.remove("secondary");
+    button.classList.toggle("active");
+    
+    const hasClass = button.classList.contains("primary"); // true
+}
+
+// Modify styles
+const card = document.getElementById("accountCard");
+if (card) {
+    card.style.backgroundColor = "#f0f0f0";
+    card.style.padding = "20px";
+    card.style.borderRadius = "8px";
+    
+    // Multiple styles
+    Object.assign(card.style, {
+        backgroundColor: "#f0f0f0",
+        padding: "20px",
+        borderRadius: "8px",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+    });
+}
+
+// Get computed style
+const computedStyle = window.getComputedStyle(card!);
+const bgColor = computedStyle.backgroundColor;
+
+// ============================================================================
+// PRACTICAL DYNAMICS EXAMPLES
+// ============================================================================
+
+// Create account card
+function createAccountCard(account: {
+    id: string;
+    name: string;
+    revenue: number;
+    category: string;
+}): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "account-card";
+    card.setAttribute("data-account-id", account.id);
+    
+    card.innerHTML = `
+        <div class="card-header">
+            <h3>${account.name}</h3>
+            <span class="category-badge">${account.category}</span>
+        </div>
+        <div class="card-body">
+            <p class="revenue">Revenue: $${account.revenue.toLocaleString()}</p>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-view" data-action="view">View</button>
+            <button class="btn btn-edit" data-action="edit">Edit</button>
+        </div>
+    `;
+    
+    return card;
+}
+
+// Render list of accounts
+function renderAccounts(accounts: any[]): void {
+    const container = document.getElementById("accountsContainer");
+    
+    if (!container) return;
+    
+    // Clear existing content
+    container.innerHTML = "";
+    
+    // Create and append account cards
+    accounts.forEach(account => {
+        const card = createAccountCard(account);
+        container.appendChild(card);
+    });
+    
+    // Add event listeners
+    container.addEventListener("click", handleAccountAction);
+}
+
+function handleAccountAction(event: Event): void {
+    const target = event.target as HTMLElement;
+    
+    if (target.classList.contains("btn")) {
+        const action = target.getAttribute("data-action");
+        const card = target.closest(".account-card");
+        const accountId = card?.getAttribute("data-account-id");
+        
+        console.log(`Action: ${action}, Account: ${accountId}`);
+    }
+}
+
+// Dynamic form field
+function createFormField(config: {
+    label: string;
+    name: string;
+    type: string;
+    required: boolean;
+}): HTMLElement {
+    const fieldContainer = document.createElement("div");
+    fieldContainer.className = "form-field";
+    
+    const label = document.createElement("label");
+    label.htmlFor = config.name;
+    label.textContent = config.label;
+    if (config.required) {
+        label.innerHTML += ' <span class="required">*</span>';
+    }
+    
+    const input = document.createElement("input");
+    input.type = config.type;
+    input.name = config.name;
+    input.id = config.name;
+    input.required = config.required;
+    
+    fieldContainer.appendChild(label);
+    fieldContainer.appendChild(input);
+    
+    return fieldContainer;
+}
+
+// Show/hide loading spinner
+function showLoading(show: boolean): void {
+    let spinner = document.getElementById("loadingSpinner");
+    
+    if (show && !spinner) {
+        spinner = document.createElement("div");
+        spinner.id = "loadingSpinner";
+        spinner.className = "spinner";
+        spinner.innerHTML = '<div class="spinner-icon"></div>';
+        document.body.appendChild(spinner);
+    } else if (!show && spinner) {
+        spinner.remove();
+    }
+}
+
+// Update form notification
+function showFormNotification(
+    message: string,
+    type: "success" | "error" | "warning" | "info"
+): void {
+    const notification = document.createElement("div");
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    const container = document.getElementById("notificationsContainer");
+    container?.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        notification.classList.add("fade-out");
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+```
+
+### Event delegation patterns
+
+```typescript
+// ============================================================================
+// ADVANCED EVENT DELEGATION
+// ============================================================================
+
+class DynamicList {
+    private container: HTMLElement;
+    private items: any[] = [];
+
+    constructor(containerId: string) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            throw new Error(`Container ${containerId} not found`);
+        }
+        this.container = container;
+        this.setupEventListeners();
+    }
+
+    private setupEventListeners(): void {
+        // Single event listener for all items
+        this.container.addEventListener("click", this.handleClick.bind(this));
+        this.container.addEventListener("change", this.handleChange.bind(this));
+    }
+
+    private handleClick(event: Event): void {
+        const target = event.target as HTMLElement;
+        
+        // Handle delete button
+        if (target.classList.contains("btn-delete")) {
+            const itemId = this.getItemId(target);
+            this.deleteItem(itemId);
+        }
+        
+        // Handle edit button
+        if (target.classList.contains("btn-edit")) {
+            const itemId = this.getItemId(target);
+            this.editItem(itemId);
+        }
+        
+        // Handle checkbox
+        if (target.tagName === "INPUT" && target.getAttribute("type") === "checkbox") {
+            const itemId = this.getItemId(target);
+            const checked = (target as HTMLInputElement).checked;
+            this.toggleItem(itemId, checked);
+        }
+    }
+
+    private handleChange(event: Event): void {
+        const target = event.target as HTMLElement;
+        
+        if (target.tagName === "SELECT") {
+            const itemId = this.getItemId(target);
+            const value = (target as HTMLSelectElement).value;
+            this.updateItemStatus(itemId, value);
+        }
+    }
+
+    private getItemId(element: HTMLElement): string {
+        const item = element.closest("[data-item-id]");
+        return item?.getAttribute("data-item-id") ?? "";
+    }
+
+    private deleteItem(id: string): void {
+        console.log("Delete item:", id);
+        // Implementation
+    }
+
+    private editItem(id: string): void {
+        console.log("Edit item:", id);
+        // Implementation
+    }
+
+    private toggleItem(id: string, checked: boolean): void {
+        console.log("Toggle item:", id, checked);
+        // Implementation
+    }
+
+    private updateItemStatus(id: string, status: string): void {
+        console.log("Update status:", id, status);
+        // Implementation
+    }
+
+    render(items: any[]): void {
+        this.items = items;
+        this.container.innerHTML = items.map(item => this.renderItem(item)).join("");
+    }
+
+    private renderItem(item: any): string {
+        return `
+            <div class="list-item" data-item-id="${item.id}">
+                <input type="checkbox" ${item.completed ? "checked" : ""} />
+                <span class="item-name">${item.name}</span>
+                <select class="item-status">
+                    <option value="pending" ${item.status === "pending" ? "selected" : ""}>Pending</option>
+                    <option value="active" ${item.status === "active" ? "selected" : ""}>Active</option>
+                    <option value="completed" ${item.status === "completed" ? "selected" : ""}>Completed</option>
+                </select>
+                <button class="btn btn-edit">Edit</button>
+                <button class="btn btn-delete">Delete</button>
+            </div>
+        `;
+    }
+}
+
+// Usage
+const list = new DynamicList("accountsList");
+list.render([
+    { id: "1", name: "Contoso", status: "active", completed: false },
+    { id: "2", name: "Fabrikam", status: "pending", completed: false }
+]);
+```
+
+---
+
+## 2.5 Interfaces i Type Safety
+
+Interfaces w TypeScript pozwalają definiować strukturę danych w sposób który zapewnia type safety i lepsze developer experience.
+
+### Definiowanie interfaces dla Dynamics entities
+
+```typescript
+// ============================================================================
+// DYNAMICS ENTITY INTERFACES
+// ============================================================================
+
+// Base entity interface
+interface BaseEntity {
+    "@odata.etag"?: string;
+    createdon?: string;
+    modifiedon?: string;
+    statecode?: number;
+    statuscode?: number;
+}
+
+// Entity Reference
+interface EntityReference {
+    "@odata.id"?: string;
+    "@odata.type"?: string;
+    id: string;
+    logicalName: string;
+    name?: string;
+}
+
+// OptionSet Value
+interface OptionSetValue {
+    value: number;
+    label?: string;
+}
+
+// Money
+interface Money {
+    value: number;
+}
+
+// Account entity
+interface Account extends BaseEntity {
+    accountid: string;
+    name: string;
+    accountnumber?: string;
+    revenue?: number;
+    numberofemployees?: number;
+    telephone1?: string;
+    emailaddress1?: string;
+    websiteurl?: string;
+    description?: string;
+    
+    // Lookup fields
+    primarycontactid?: EntityReference;
+    ownerid?: EntityReference;
+    
+    // OptionSet fields
+    accountcategorycode?: number;
+    accountratingcode?: number;
+    customertypecode?: number;
+    
+    // Formatted values (read-only)
+    "accountcategorycode@OData.Community.Display.V1.FormattedValue"?: string;
+    "createdon@OData.Community.Display.V1.FormattedValue"?: string;
+}
+
+// Contact entity
+interface Contact extends BaseEntity {
+    contactid: string;
+    firstname: string;
+    lastname: string;
+    fullname?: string;
+    emailaddress1?: string;
+    telephone1?: string;
+    mobilephone?: string;
+    jobtitle?: string;
+    
+    // Lookups
+    parentcustomerid?: EntityReference;
+    ownerid?: EntityReference;
+    
+    // OptionSets
+    preferredcontactmethodcode?: number;
+    customertypecode?: number;
+}
+
+// Opportunity entity
+interface Opportunity extends BaseEntity {
+    opportunityid: string;
+    name: string;
+    estimatedvalue?: number;
+    closeprobability?: number;
+    estimatedclosedate?: string;
+    description?: string;
+    
+    // Lookups
+    customerid?: EntityReference;
+    ownerid?: EntityReference;
+    
+    // OptionSets
+    salesstagecode?: number;
+    opportunityratingcode?: number;
+}
+
+// ============================================================================
+// GENERIC ENTITY OPERATIONS
+// ============================================================================
+
+// CRUD operations interface
+interface ICrudOperations<T extends BaseEntity> {
+    create(entity: Omit<T, keyof BaseEntity>): Promise<string>;
+    retrieve(id: string, select?: (keyof T)[]): Promise<T>;
+    update(id: string, entity: Partial<T>): Promise<void>;
+    delete(id: string): Promise<void>;
+    retrieveMultiple(query: QueryOptions<T>): Promise<T[]>;
+}
+
+// Query options
+interface QueryOptions<T> {
+    select?: (keyof T)[];
+    filter?: string;
+    orderby?: { field: keyof T; direction: "asc" | "desc" }[];
+    top?: number;
+    expand?: ExpandOption<T>[];
+}
+
+interface ExpandOption<T> {
+    navigationProperty: string;
+    select?: string[];
+}
+
+// ============================================================================
+// TYPE-SAFE REPOSITORY
+// ============================================================================
+
+class EntityRepository<T extends BaseEntity> implements ICrudOperations<T> {
+    constructor(
+        private entitySetName: string,
+        private entityIdField: keyof T
+    ) {}
+
+    async create(entity: Omit<T, keyof BaseEntity>): Promise<string> {
+        const api = new DynamicsWebAPI();
+        return api.create(this.entitySetName, entity);
+    }
+
+    async retrieve(id: string, select?: (keyof T)[]): Promise<T> {
+        const api = new DynamicsWebAPI();
+        const selectFields = select?.map(f => f.toString());
+        return api.retrieve(this.entitySetName, id, selectFields);
+    }
+
+    async update(id: string, entity: Partial<T>): Promise<void> {
+        const api = new DynamicsWebAPI();
+        return api.update(this.entitySetName, id, entity);
+    }
+
+    async delete(id: string): Promise<void> {
+        const api = new DynamicsWebAPI();
+        return api.delete(this.entitySetName, id);
+    }
+
+    async retrieveMultiple(query: QueryOptions<T>): Promise<T[]> {
+        const api = new DynamicsWebAPI();
+        
+        const apiQuery: any = {};
+        
+        if (query.select) {
+            apiQuery.select = query.select.map(f => f.toString());
+        }
+        
+        if (query.filter) {
+            apiQuery.filter = query.filter;
+        }
+        
+        if (query.orderby) {
+            apiQuery.orderby = query.orderby
+                .map(o => `${o.field.toString()} ${o.direction}`)
+                .join(",");
+        }
+        
+        if (query.top) {
+            apiQuery.top = query.top;
+        }
+        
+        return api.retrieveMultiple(this.entitySetName, apiQuery);
+    }
+}
+
+// ============================================================================
+// USAGE EXAMPLES
+// ============================================================================
+
+// Type-safe account repository
+const accountRepo = new EntityRepository<Account>("accounts", "accountid");
+
+async function workWithAccounts(): Promise<void> {
+    // Create - TypeScript ensures we provide required fields
+    const accountId = await accountRepo.create({
+        name: "Contoso Ltd", // Required
+        revenue: 1000000,
+        numberofemployees: 250
+    });
+
+    // Retrieve - type-safe field selection
+    const account = await accountRepo.retrieve(accountId, [
+        "name",
+        "revenue",
+        "numberofemployees",
+        "primarycontactid"
+    ]);
+
+    // TypeScript knows the structure
+    console.log(account.name); // ✅ Type-safe
+    console.log(account.revenue); // ✅ Type-safe
+    // console.log(account.invalidField); // ❌ Compile error!
+
+    // Update - Partial<T> allows updating subset of fields
+    await accountRepo.update(accountId, {
+        revenue: 2000000
+    });
+
+    // Query - type-safe filters and ordering
+    const highRevenueAccounts = await accountRepo.retrieveMultiple({
+        filter: "revenue gt 1000000",
+        select: ["name", "revenue", "numberofemployees"],
+        orderby: [{ field: "revenue", direction: "desc" }],
+        top: 10
+    });
+
+    // Process results with full type safety
+    for (const acc of highRevenueAccounts) {
+        console.log(`${acc.name}: $${acc.revenue}`);
+    }
+}
+
+// ============================================================================
+// FORM CONTEXT TYPING
+// ============================================================================
+
+// Comprehensive form context interfaces
+interface Xrm {
+    Page: FormContext;
+    Navigation: Navigation;
+    Utility: Utility;
+    WebApi: WebApi;
+}
+
+interface FormContext {
+    data: FormData;
+    ui: FormUI;
+    getAttribute(attributeName: string): Attribute | null;
+    getControl(controlName: string): Control | null;
+}
+
+interface FormData {
+    entity: Entity;
+    process: Process;
+    save(saveOptions?: SaveOptions): Promise<void>;
+    refresh(save?: boolean): Promise<void>;
+}
+
+interface Entity {
+    getEntityName(): string;
+    getId(): string;
+    getIsDirty(): boolean;
+    getPrimaryAttributeValue(): any;
+    
+    attributes: AttributeCollection;
+    
+    addOnSave(handler: () => void): void;
+    removeOnSave(handler: () => void): void;
+}
+
+interface AttributeCollection {
+    get(): Attribute[];
+    get(attributeName: string): Attribute | null;
+    get(index: number): Attribute | null;
+    get(delegate: (attribute: Attribute, index: number) => boolean): Attribute[];
+    
+    forEach(delegate: (attribute: Attribute, index: number) => void): void;
+    getLength(): number;
+}
+
+interface Attribute {
+    getName(): string;
+    getValue<T = any>(): T | null;
+    setValue(value: any): void;
+    
+    getRequiredLevel(): "none" | "required" | "recommended";
+    setRequiredLevel(level: "none" | "required" | "recommended"): void;
+    
+    getIsDirty(): boolean;
+    
+    addOnChange(handler: () => void): void;
+    removeOnChange(handler: () => void): void;
+    
+    controls: ControlCollection;
+}
+
+interface ControlCollection {
+    get(): Control[];
+    get(controlName: string): Control | null;
+    get(index: number): Control | null;
+    forEach(delegate: (control: Control, index: number) => void): void;
+    getLength(): number;
+}
+
+interface Control {
+    getName(): string;
+    getControlType(): string;
+    
+    getVisible(): boolean;
+    setVisible(visible: boolean): void;
+    
+    getDisabled(): boolean;
+    setDisabled(disabled: boolean): void;
+    
+    getLabel(): string;
+    setLabel(label: string): void;
+    
+    getAttribute(): Attribute | null;
+    
+    setFocus(): void;
+}
+
+interface FormUI {
+    controls: ControlCollection;
+    tabs: TabCollection;
+    
+    setFormNotification(message: string, level: "INFO" | "WARNING" | "ERROR", uniqueId: string): boolean;
+    clearFormNotification(uniqueId: string): boolean;
+    
+    getFormType(): 0 | 1 | 2 | 3 | 4 | 6; // Undefined, Create, Update, ReadOnly, Disabled, BulkEdit
+    
+    close(): void;
+}
+
+interface TabCollection {
+    get(): Tab[];
+    get(tabName: string): Tab | null;
+    get(index: number): Tab | null;
+    forEach(delegate: (tab: Tab, index: number) => void): void;
+    getLength(): number;
+}
+
+interface Tab {
+    getName(): string;
+    getLabel(): string;
+    setLabel(label: string): void;
+    
+    getVisible(): boolean;
+    setVisible(visible: boolean): void;
+    
+    getDisplayState(): "expanded" | "collapsed";
+    setDisplayState(state: "expanded" | "collapsed"): void;
+    
+    sections: SectionCollection;
+}
+
+interface SectionCollection {
+    get(): Section[];
+    get(sectionName: string): Section | null;
+    get(index: number): Section | null;
+    forEach(delegate: (section: Section, index: number) => void): void;
+    getLength(): number;
+}
+
+interface Section {
+    getName(): string;
+    getLabel(): string;
+    setLabel(label: string): void;
+    
+    getVisible(): boolean;
+    setVisible(visible: boolean): void;
+    
+    controls: ControlCollection;
+}
+
+interface SaveOptions {
+    saveMode: 1 | 2 | 47 | 58 | 59 | 70; // Save, SaveAndClose, AutoSave, SaveAsCompleted, SaveAndNew, Qualify
+}
+
+// ============================================================================
+// TYPE-SAFE FORM SCRIPT
+// ============================================================================
+
+class TypeSafeAccountForm {
+    private formContext: FormContext;
+
+    constructor(executionContext: any) {
+        this.formContext = executionContext.getFormContext();
+    }
+
+    onLoad(): void {
+        this.setupFieldRequirements();
+        this.setupFieldVisibility();
+        this.setupChangeHandlers();
+    }
+
+    private setupFieldRequirements(): void {
+        // Type-safe field access
+        const nameAttr = this.formContext.getAttribute("name");
+        const revenueAttr = this.formContext.getAttribute("revenue");
+        
+        nameAttr?.setRequiredLevel("required");
+        revenueAttr?.setRequiredLevel("recommended");
+    }
+
+    private setupFieldVisibility(): void {
+        const formType = this.formContext.ui.getFormType();
+        
+        // Show certain fields only on create
+        if (formType === 1) { // Create
+            this.formContext.getControl("accountnumber")?.setVisible(true);
+        }
+    }
+
+    private setupChangeHandlers(): void {
+        this.formContext.getAttribute("revenue")?.addOnChange(() => {
+            this.onRevenueChange();
+        });
+    }
+
+    private onRevenueChange(): void {
+        const revenue = this.formContext.getAttribute("revenue")?.getValue<number>();
+        
+        if (revenue && revenue > 1000000) {
+            this.formContext.ui.setFormNotification(
+                "High revenue account requires approval",
+                "WARNING",
+                "revenue_warning"
+            );
+        } else {
+            this.formContext.ui.clearFormNotification("revenue_warning");
+        }
+    }
+
+    onSave(executionContext: any): void {
+        const saveEvent = executionContext.getEventArgs();
+        
+        // Validate before save
+        if (!this.validateForm()) {
+            saveEvent.preventDefault();
+        }
+    }
+
+    private validateForm(): boolean {
+        const name = this.formContext.getAttribute("name")?.getValue<string>();
+        
+        if (!name || name.trim().length === 0) {
+            this.formContext.ui.setFormNotification(
+                "Account name is required",
+                "ERROR",
+                "name_validation"
+            );
+            return false;
+        }
+        
+        return true;
+    }
+}
+
+// Register handlers - global functions required by Dynamics
+function onAccountFormLoad(executionContext: any): void {
+    const form = new TypeSafeAccountForm(executionContext);
+    form.onLoad();
+}
+
+function onAccountFormSave(executionContext: any): void {
+    const form = new TypeSafeAccountForm(executionContext);
+    form.onSave(executionContext);
+}
+```
+
+---
+
+[KONIEC ROZDZIAŁU 2 - CZĘŚĆ 1]
