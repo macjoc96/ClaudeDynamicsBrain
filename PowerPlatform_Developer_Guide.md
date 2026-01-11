@@ -8046,3 +8046,2667 @@ W **Rozdziale 4** poznasz **Narzędzia deweloperskie** - Visual Studio, VS Code,
 
 ---
 
+
+---
+
+# Rozdział 4: Narzędzia deweloperskie - warsztat profesjonalisty
+
+## Wprowadzenie
+
+**"Dobry rzemieślnik zna swoje narzędzia"** - to powiedzenie jest szczególnie prawdziwe w świecie Dynamics 365 development. Różnica między początkującym a doświadczonym developerem często nie leży w znajomości języka programowania, ale w **efektywnym wykorzystaniu narzędzi**.
+
+### Analogia: Stolarz vs Developer
+
+Wyobraź sobie dwóch stolarzy:
+
+**Stolarz A** (początkujący):
+- Ma tylko piłę ręczną i młotek
+- Każdy mebel robi "na piechotę"
+- Praca trwa tygodnie
+- Często popełnia błędy
+
+**Stolarz B** (profesjonalista):
+- Ma piłę elektryczną, strugarką, szlifierkę
+- Używa szablonów i mierników
+- Ta sama praca trwa dni
+- Precyzja i jakość znacznie wyższa
+
+W Dynamics 365 development sytuacja jest identyczna. **Narzędzia nie robią za Ciebie myślenia**, ale pozwalają skupić się na rozwiązywaniu problemów biznesowych zamiast walki z infrastrukturą.
+
+### Ekosystem narzędzi Dynamics 365
+
+```mermaid
+graph TB
+    subgraph "Development Environment"
+        VS[Visual Studio<br/>C# Plugins]
+        VSC[VS Code<br/>TypeScript/JS]
+    end
+    
+    subgraph "Power Platform Tools"
+        XRM[XrmToolBox<br/>200+ plugins]
+        CLI[Power Platform CLI<br/>pac commands]
+    end
+    
+    subgraph "Version Control"
+        GIT[Git<br/>Source control]
+        GITHUB[GitHub/Azure DevOps<br/>Collaboration]
+    end
+    
+    subgraph "Target Environment"
+        DEV[Development]
+        TEST[Test/UAT]
+        PROD[Production]
+    end
+    
+    VS --> GIT
+    VSC --> GIT
+    XRM --> DEV
+    CLI --> DEV
+    GIT --> GITHUB
+    GITHUB --> TEST
+    GITHUB --> PROD
+    
+    style VS fill:#C5CAE9
+    style VSC fill:#B2DFDB
+    style XRM fill:#FFE082
+    style CLI fill:#FFCCBC
+    style GIT fill:#F8BBD0
+```
+
+### Czego się nauczysz?
+
+W tym rozdziale szczegółowo poznasz:
+
+1. **Visual Studio** - IDE dla C# plugin development
+2. **Visual Studio Code** - lekki editor dla TypeScript/JavaScript
+3. **XrmToolBox** - szwajcarski scyzoryk Dynamics 365
+4. **Power Platform CLI** - command-line automation
+5. **Git** - version control i collaboration
+
+> 💡 **WAŻNE**: To nie jest tutorial "kliknij tu, kliknij tam". To **zrozumienie dlaczego każde narzędzie istnieje, jak działa i kiedy go używać**.
+
+---
+
+## 4.1 Visual Studio - IDE dla C# Development
+
+### Czym jest Visual Studio i dlaczego jest niezbędny?
+
+**Visual Studio** to Integrated Development Environment (IDE) od Microsoft - najbardziej zaawansowane środowisko do C# development. Dla Dynamics 365 plugin development jest **de facto standardem**.
+
+**Dlaczego nie można pisać pluginów w Notepad?**
+
+Teoretycznie można. Ale:
+
+```
+Notepad:
+1. Napisz kod bez IntelliSense (zgaduj nazwy metod)
+2. Zapisz jako .cs
+3. Uruchom kompilator z command line
+4. Czytaj błędy kompilacji w konsoli
+5. Wróć do punktu 1
+Time: ~2 hours dla prostego pluginu
+
+Visual Studio:
+1. Pisz kod z IntelliSense (autocomplete)
+2. Błędy pokazane na bieżąco (czerwone podkreślenia)
+3. Ctrl+F5 - kompilacja i build
+4. Debugger - step-through code
+Time: ~20 minutes dla tego samego pluginu
+
+6x SZYBSZE!
+```
+
+### Edycje Visual Studio
+
+Microsoft oferuje kilka edycji:
+
+| Edycja | Cena | Dla kogo | Dynamics 365 Support |
+|--------|------|----------|---------------------|
+| **Community** | 🆓 FREE | Indie developers, students, open-source | ✅ Pełne wsparcie |
+| **Professional** | ~$45/mies | Small teams | ✅ Pełne wsparcie |
+| **Enterprise** | ~$250/mies | Large organizations | ✅ Pełne wsparcie + advanced tools |
+
+> 💡 **TIP**: Dla większości Dynamics 365 developers **Community Edition wystarczy**! Ma wszystkie potrzebne funkcje.
+
+### Instalacja i konfiguracja - krok po kroku
+
+**Krok 1: Download Visual Studio**
+
+```
+URL: https://visualstudio.microsoft.com/downloads/
+Wybierz: Visual Studio 2022 Community (FREE)
+Rozmiar: ~3-5 GB (z workloads)
+```
+
+**Krok 2: Wybór Workloads**
+
+Podczas instalacji zaznacz:
+
+✅ **.NET desktop development** (REQUIRED)
+- C# compiler
+- .NET Framework 4.6.2+ (wymagane dla Dynamics SDK)
+- NuGet package manager
+
+✅ **Azure development** (OPTIONAL ale polecane)
+- Azure Functions tools (dla integracji)
+- Azure Storage Explorer
+
+✅ **ASP.NET and web development** (OPTIONAL)
+- Jeśli planujesz custom web apps
+
+**Dlaczego te workloads?**
+
+```
+.NET desktop development:
+├─ C# Language Support
+├─ .NET Framework 4.6.2 (Dynamics 365 target)
+├─ NuGet (do instalacji Microsoft.CrmSdk packages)
+└─ MSBuild (kompilator)
+
+Bez tego: Nie skompilujesz pluginu!
+```
+
+**Krok 3: Instalacja Dynamics 365 SDK**
+
+Po instalacji VS, zainstaluj SDK przez NuGet:
+
+```powershell
+# W Visual Studio Package Manager Console:
+Install-Package Microsoft.CrmSdk.CoreAssemblies
+Install-Package Microsoft.CrmSdk.Workflow
+Install-Package Microsoft.CrmSdk.XrmTooling.CoreAssembly
+```
+
+**Co instalujemy?**
+
+| Package | Co zawiera | Kiedy używasz |
+|---------|------------|---------------|
+| **CoreAssemblies** | IOrganizationService, Entity, QueryExpression | ZAWSZE (każdy plugin) |
+| **Workflow** | CodeActivity (custom workflow activities) | Custom workflows |
+| **XrmTooling** | CrmServiceClient (połączenie do CRM) | Konsole apps, testing |
+
+### Struktura projektu plugin - best practices
+
+**Podstawowa struktura:**
+
+```
+MyDynamicsPlugins/                    (Solution)
+│
+├── MyDynamicsPlugins.sln             (Solution file)
+│
+├── Plugins/                          (Plugin Project)
+│   ├── Plugins.csproj
+│   ├── Properties/
+│   │   └── AssemblyInfo.cs          (Version, strong name)
+│   ├── Account/
+│   │   ├── AccountPreCreate.cs      (Plugins grouped by entity)
+│   │   ├── AccountPreUpdate.cs
+│   │   └── AccountPostCreate.cs
+│   ├── Contact/
+│   │   ├── ContactPreCreate.cs
+│   │   └── ContactValidation.cs
+│   ├── Common/
+│   │   ├── BasePlugin.cs            (Base class for all plugins)
+│   │   └── PluginHelper.cs          (Shared utilities)
+│   └── packages.config              (NuGet dependencies)
+│
+├── Plugins.Tests/                    (Unit Test Project)
+│   ├── Plugins.Tests.csproj
+│   ├── Account/
+│   │   ├── AccountPreCreateTests.cs
+│   │   └── AccountPreUpdateTests.cs
+│   └── packages.config
+│
+└── README.md                         (Documentation)
+```
+
+**Dlaczego ta struktura?**
+
+```
+Grupowanie po encjach (Account/, Contact/):
+✅ Łatwo znaleźć plugin dla konkretnej encji
+✅ Scalable (możesz mieć 100+ pluginów)
+✅ Code review friendly
+
+Common/:
+✅ Reużywalne komponenty
+✅ Eliminuje duplikację kodu
+✅ Łatwiejsze maintenance
+
+Plugins.Tests/:
+✅ Unit tests obok production code
+✅ Same naming convention
+✅ Ułatwia TDD (Test-Driven Development)
+```
+
+### IntelliSense - "AI asystent" Visual Studio
+
+**IntelliSense** to system autocomplete Visual Studio. Działa jak "AI asystent" (ale istnieje od 1996!).
+
+**Przykład w akcji:**
+
+```csharp
+// Wpisujesz:
+Entity account = new Entity("account");
+account.
+
+// IntelliSense pokazuje:
+┌─────────────────────────────────────┐
+│ Attributes                          │ ← Dictionary<string, object>
+│ Contains(string key)                │ ← bool
+│ FormattedValues                     │ ← FormattedValueCollection
+│ GetAttributeValue<T>(string name)  │ ← T
+│ Id                                  │ ← Guid
+│ LogicalName                         │ ← string
+│ ToEntityReference()                 │ ← EntityReference
+└─────────────────────────────────────┘
+
+// Wybierasz GetAttributeValue i wpisujesz <
+account.GetAttributeValue<
+
+// IntelliSense podpowiada typy:
+┌─────────────────────────────────────┐
+│ string                              │
+│ int                                 │
+│ decimal                             │
+│ Money                               │ ← Dynamics type
+│ EntityReference                     │ ← Dynamics type
+│ OptionSetValue                      │ ← Dynamics type
+└─────────────────────────────────────┘
+```
+
+**Keyboard shortcuts dla IntelliSense:**
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl + Space` | Trigger IntelliSense manually |
+| `Ctrl + .` | Quick Actions (suggestions) |
+| `F12` | Go to Definition |
+| `Alt + F12` | Peek Definition (inline) |
+| `Shift + F12` | Find All References |
+
+> 💡 **TIP**: Zamiast zapamiętywać nazwy metod, używaj IntelliSense. To oszczędza czas i redukuje typo errors.
+
+### Debugger - "X-ray vision" dla kodu
+
+**Debugger** pozwala zobaczyć co NAPRAWDĘ dzieje się w kodzie krok po kroku.
+
+**Podstawy debugowania:**
+
+```csharp
+public class AccountPlugin : IPlugin
+{
+    public void Execute(IServiceProvider serviceProvider)
+    {
+        var context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+        
+        // 1. Ustaw BREAKPOINT tutaj (kliknij na lewym marginesie - czerwona kropka)
+        Entity target = (Entity)context.InputParameters["Target"];
+        
+        // 2. Uruchom plugin
+        // 3. Kod zatrzyma się na breakpoint
+        // 4. Możesz:
+        //    - Zobaczyć wartości wszystkich zmiennych
+        //    - Step over (F10) - następna linia
+        //    - Step into (F11) - wejdź do metody
+        //    - Continue (F5) - kontynuuj do następnego breakpoint
+        
+        string accountName = target.GetAttributeValue<string>("name");
+        
+        // Watch window pokazuje:
+        // target.Attributes.Count = 5
+        // accountName = "Contoso Ltd"
+        // context.Depth = 1
+        
+        if (string.IsNullOrWhiteSpace(accountName))
+        {
+            throw new InvalidPluginExecutionException("Name required");
+        }
+    }
+}
+```
+
+**Debug Windows:**
+
+| Window | Co pokazuje | Shortcut |
+|--------|-------------|----------|
+| **Locals** | Zmienne w aktualnym scope | `Ctrl + Alt + V, L` |
+| **Watch** | Custom expressions do monitorowania | `Ctrl + Alt + W, 1` |
+| **Call Stack** | Sekwencja wywołań metod | `Ctrl + Alt + C` |
+| **Immediate** | Wykonuj kod podczas debug | `Ctrl + Alt + I` |
+
+**Praktyczny przykład debugowania:**
+
+```csharp
+// Problem: Plugin rzuca NullReferenceException
+public void Execute(IServiceProvider serviceProvider)
+{
+    var context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+    Entity target = (Entity)context.InputParameters["Target"];
+    
+    // ❌ Crash tutaj! Dlaczego?
+    string email = target["emailaddress1"].ToString();
+}
+
+// Debug session:
+// 1. Breakpoint przed crash
+// 2. Watch: target["emailaddress1"]
+// 3. Zobacz: null
+// 4. Aha! Attribute nie istnieje!
+
+// ✅ Fix:
+string email = target.Contains("emailaddress1") 
+    ? target["emailaddress1"].ToString() 
+    : null;
+```
+
+### Plugin Registration Tool integration
+
+**Power Platform Tools Extension** integruje Plugin Registration Tool z Visual Studio.
+
+**Instalacja:**
+
+```
+1. Visual Studio → Extensions → Manage Extensions
+2. Search: "Power Platform Tools"
+3. Download & Install
+4. Restart Visual Studio
+```
+
+**Co daje:**
+
+```
+Bez extension:
+1. Build plugin w VS
+2. Otwórz XrmToolBox
+3. Otwórz Plugin Registration Tool
+4. Update assembly
+5. Test
+6. Wróć do VS dla zmian
+7. Repeat
+
+Z extension:
+1. Right-click na projekt
+2. "Deploy to Dataverse"
+3. Automatically:
+   - Builds
+   - Signs assembly
+   - Uploads to Dataverse
+   - Registers/updates
+4. Test
+5. Zmień kod w VS
+6. Repeat
+
+5x SZYBSZE!
+```
+
+### Extensions rekomendowane
+
+| Extension | Co robi | Dlaczego przydatne |
+|-----------|---------|-------------------|
+| **Power Platform Tools** | Deploy plugins z VS | No more XrmToolBox dla deploy |
+| **CodeMaid** | Code cleanup, formatting | Automatic formatting, organize usings |
+| **ReSharper** (paid) | Advanced refactoring | Pro developers - warto inwestycji |
+| **Visual Studio IntelliCode** | AI-assisted coding | Better IntelliSense suggestions |
+| **GitLens** | Git integration | See git blame, history inline |
+
+### Keyboard shortcuts - productivity boost
+
+**Must-know shortcuts:**
+
+| Shortcut | Action | Czas zaoszczędzony |
+|----------|--------|-------------------|
+| `Ctrl + K, Ctrl + D` | Format document | 30s każdorazowo |
+| `Ctrl + .` | Quick fix | 1min każdorazowo |
+| `F12` | Go to definition | 10s każdorazowo |
+| `Ctrl + -` | Navigate backward | 5s każdorazowo |
+| `Ctrl + Shift + F` | Find in files | 2min każdorazowo |
+| `Ctrl + K, Ctrl + C` | Comment lines | 10s każdorazowo |
+| `Ctrl + K, Ctrl + U` | Uncomment lines | 10s każdorazowo |
+| `Ctrl + R, Ctrl + R` | Rename (refactor) | 5min każdorazowo |
+
+**Daily impact:**
+
+```
+Używając shortcuts 50x dziennie:
+50 × 30 seconds = 1,500 seconds = 25 MINUT zaoszczędzonych DZIENNIE!
+
+Rocznie: 25min × 250 dni roboczych = 6,250 minut = 104 GODZINY!
+```
+
+### Best practices Visual Studio
+
+#### 1. Zawsze używaj Solution Configuration
+
+```
+Debug Configuration:
+✅ Full debug symbols
+✅ No optimizations
+✅ Łatwe debugowanie
+❌ Większy rozmiar assembly
+❌ Wolniejsze wykonanie
+
+Release Configuration:
+❌ Minimalne debug symbols
+✅ Optimized code
+✅ Mniejszy rozmiar
+✅ Szybsze wykonanie
+```
+
+**Kiedy co:**
+- Development: **Debug**
+- Production: **Release**
+
+#### 2. Używaj Code Snippets
+
+```csharp
+// Zamiast pisać cały try-catch:
+try
+{
+}
+catch (Exception)
+{
+}
+
+// Wpisz: try [Tab][Tab]
+// Visual Studio auto-complete!
+```
+
+**Własne snippets dla Dynamics:**
+
+```xml
+<!-- Plugin snippet - zapisz w VS -->
+<?xml version="1.0" encoding="utf-8"?>
+<CodeSnippets>
+    <CodeSnippet Format="1.0.0">
+        <Header>
+            <Title>Dynamics Plugin</Title>
+            <Shortcut>plugin</Shortcut>
+        </Header>
+        <Snippet>
+            <Code Language="csharp">
+                <![CDATA[public class $className$ : IPlugin
+{
+    public void Execute(IServiceProvider serviceProvider)
+    {
+        var context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+        var factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+        var service = factory.CreateOrganizationService(context.UserId);
+        var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+        
+        try
+        {
+            $end$
+        }
+        catch (Exception ex)
+        {
+            tracing.Trace($"Error: {ex.Message}");
+            throw new InvalidPluginExecutionException($"Error in {nameof($className$)}", ex);
+        }
+    }
+}]]>
+            </Code>
+        </Snippet>
+    </CodeSnippet>
+</CodeSnippets>
+```
+
+#### 3. Organizuj usings
+
+```csharp
+// ❌ ŹLE - duplikaty i nieużywane usings
+using System;
+using Microsoft.Xrm.Sdk;
+using System.Linq;
+using System.Collections.Generic;
+using Microsoft.Xrm.Sdk.Query;
+using System.IO;  // Nieużywane!
+
+// ✅ DOBRZE - uporządkowane (Ctrl+K, Ctrl+D)
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+```
+
+> 💡 **TIP**: `Ctrl + R, Ctrl + G` - Remove and Sort Usings
+
+---
+
+## 4.2 Visual Studio Code - lekki editor dla TypeScript/JavaScript
+
+### VS Code vs Visual Studio - kiedy co?
+
+| Aspekt | Visual Studio | VS Code |
+|--------|--------------|---------|
+| **Rozmiar** | ~10-20 GB | ~200 MB |
+| **Startup** | ~10-30 sekund | ~1-2 sekundy |
+| **C# Plugins** | ✅✅✅ BEST | ⚠️ Possible ale niewygodne |
+| **TypeScript/JS** | ✅ OK | ✅✅✅ BEST |
+| **Web Resources** | ⚠️ Possible | ✅✅✅ BEST |
+| **React (Code Apps)** | ⚠️ Possible | ✅✅✅ BEST |
+| **Extensions** | ~5,000 | ~50,000 |
+| **Remote Dev** | ❌ | ✅ (WSL, SSH, Containers) |
+| **Cross-platform** | Windows only | Windows, Mac, Linux |
+
+**Proste zasady:**
+
+```
+C# Plugin Development → Visual Studio
+TypeScript/JavaScript → VS Code
+Web Resources → VS Code
+Power Apps Code Apps → VS Code
+Quick edits → VS Code
+```
+
+### Instalacja i konfiguracja
+
+**Krok 1: Download**
+
+```
+URL: https://code.visualstudio.com/
+Rozmiar: ~90 MB installer
+System: Windows, macOS, Linux
+```
+
+**Krok 2: Essential Extensions dla Dynamics 365**
+
+```
+1. Power Platform VS Code Extension (Microsoft) - MUST HAVE
+2. ESLint - JavaScript linting
+3. Prettier - Code formatter
+4. GitLens - Git supercharged
+5. JavaScript Debugger
+6. TypeScript Vue Plugin (jeśli używasz Vue)
+```
+
+**Instalacja extensions:**
+
+```bash
+# Via command line (szybsze!)
+code --install-extension ms-dynamics-crm.powerplatform-vscode
+code --install-extension dbaeumer.vscode-eslint
+code --install-extension esbenp.prettier-vscode
+code --install-extension eamodio.gitlens
+```
+
+### Power Platform Extension - game changer
+
+**Co robi Power Platform Extension?**
+
+```mermaid
+graph LR
+    A[VS Code] --> B[Power Platform Extension]
+    B --> C[Connect to Dataverse]
+    B --> D[Deploy Web Resources]
+    B --> E[Download Web Resources]
+    B --> F[Compare Local vs Remote]
+    B --> G[Code Apps (pac CLI)]
+    
+    style B fill:#4CAF50
+```
+
+**Workflow bez extension:**
+
+```
+1. Edit HTML/JS file locally
+2. Open Dynamics 365 web interface
+3. Navigate to Solutions → Web Resources
+4. Find your web resource
+5. Click "Edit"
+6. Copy-paste code
+7. Click "Save"
+8. Click "Publish"
+9. Test
+10. Find bug
+11. Go to step 1
+
+PER ZMIANA: ~5 minut!
+```
+
+**Workflow z extension:**
+
+```
+1. Edit HTML/JS file locally
+2. Ctrl+Shift+P → "Power Platform: Push"
+3. Test
+4. Find bug
+5. Go to step 1
+
+PER ZMIANA: ~10 sekund!
+
+30x SZYBSZE!
+```
+
+### TypeScript development w VS Code
+
+**Setup projektu TypeScript:**
+
+```bash
+# 1. Initialize project
+npm init -y
+
+# 2. Install TypeScript
+npm install --save-dev typescript
+
+# 3. Install Dynamics types
+npm install --save-dev @types/xrm
+
+# 4. Create tsconfig.json
+npx tsc --init
+```
+
+**tsconfig.json dla Dynamics:**
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "none",
+    "lib": ["ES2015", "DOM"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["xrm"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+```
+
+**Struktura projektu:**
+
+```
+WebResources/
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── forms/
+│   │   ├── account-form.ts
+│   │   └── contact-form.ts
+│   ├── ribbons/
+│   │   └── account-ribbon.ts
+│   └── common/
+│       ├── xrm-helpers.ts
+│       └── validators.ts
+├── dist/                    (compiled JS)
+│   ├── account-form.js
+│   └── contact-form.js
+└── README.md
+```
+
+**Build command:**
+
+```json
+{
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "deploy": "tsc && pac webresource push"
+  }
+}
+```
+
+```bash
+# Development
+npm run watch   # Auto-compile on save
+
+# Deploy
+npm run deploy  # Compile & push to Dataverse
+```
+
+
+### IntelliSense dla Xrm API
+
+**Problem:** TypeScript nie zna Dynamics API out-of-the-box.
+
+```typescript
+// ❌ Błąd - TypeScript nie wie co to formContext
+function onLoad(executionContext) {
+    const formContext = executionContext.getFormContext();
+    // Error: Property 'getFormContext' does not exist
+}
+```
+
+**Rozwiązanie:** `@types/xrm`
+
+```typescript
+// ✅ Z types - pełne IntelliSense!
+function onLoad(executionContext: Xrm.Events.EventContext): void {
+    const formContext = executionContext.getFormContext();
+    
+    // IntelliSense pokazuje:
+    // - formContext.data
+    // - formContext.ui
+    // - formContext.getAttribute()
+    // - etc.
+    
+    const nameAttr = formContext.getAttribute<Xrm.Attributes.StringAttribute>("name");
+    nameAttr?.setValue("New Value");
+}
+```
+
+### Debugging w VS Code
+
+**Launch configuration** dla web resources:
+
+```json
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "msedge",
+      "request": "launch",
+      "name": "Debug Form in Edge",
+      "url": "https://yourorg.crm.dynamics.com/main.aspx?appid=...",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMaps": true
+    }
+  ]
+}
+```
+
+**Workflow:**
+
+```
+1. Set breakpoint w TypeScript
+2. F5 (Start Debugging)
+3. VS Code otwiera Edge z Dynamics
+4. Otwórz form
+5. Breakpoint hit - debug w VS Code!
+```
+
+### Snippets w VS Code
+
+**Custom snippets dla Dynamics:**
+
+```json
+// .vscode/dynamics.code-snippets
+{
+  "Dynamics Form OnLoad": {
+    "prefix": "dynformload",
+    "body": [
+      "function onLoad(executionContext: Xrm.Events.EventContext): void {",
+      "    const formContext = executionContext.getFormContext();",
+      "    ",
+      "    try {",
+      "        $0",
+      "    } catch (error) {",
+      "        console.error('Error in onLoad:', error);",
+      "    }",
+      "}"
+    ],
+    "description": "Dynamics 365 form OnLoad handler"
+  },
+  
+  "Dynamics Get Attribute": {
+    "prefix": "dyngetattr",
+    "body": [
+      "const ${1:attrName} = formContext.getAttribute<${2:Xrm.Attributes.StringAttribute}>(\"${3:attributeName}\");"
+    ],
+    "description": "Get form attribute with type"
+  }
+}
+```
+
+**Usage:**
+
+```typescript
+// Wpisz: dynformload [Tab]
+// Auto-generuje:
+function onLoad(executionContext: Xrm.Events.EventContext): void {
+    const formContext = executionContext.getFormContext();
+    
+    try {
+        |cursor tutaj|
+    } catch (error) {
+        console.error('Error in onLoad:', error);
+    }
+}
+```
+
+---
+
+## 4.3 XrmToolBox - szwajcarski scyzoryk Dynamics 365
+
+### Czym jest XrmToolBox?
+
+**XrmToolBox** to **darmowa**, **open-source** aplikacja Windows która agreguje **200+ narzędzi** dla Dynamics 365 w jednym miejscu.
+
+**Analogia:**
+
+```
+Dynamics 365 bez XrmToolBox = Gotowanie bez noży kuchennych
+- Możliwe, ale bardzo trudne
+- Każde proste zadanie zajmuje godziny
+- Frustrujące i error-prone
+
+Dynamics 365 z XrmToolBox = Profesjonalna kuchnia
+- Każde narzędzie pod ręką
+- Proste zadania w sekundy
+- Przyjemność pracy
+```
+
+### Dlaczego XrmToolBox jest niezbędny?
+
+**Przykład: Bulk update 1000 rekordów**
+
+**Bez XrmToolBox:**
+
+```csharp
+// 1. Napisz C# console app
+// 2. Setup CrmServiceClient
+// 3. Query 1000 accounts
+// 4. Loop i update każdy
+// 5. Handle errors
+// 6. Logging
+// 7. Run
+// 8. Debug gdy coś pójdzie nie tak
+
+Time: ~2 hours dla doświadczonego developera
+```
+
+**Z XrmToolBox (Bulk Workflow Execution tool):**
+
+```
+1. Otwórz XrmToolBox
+2. Connect do environment
+3. Open "Bulk Data Updater"
+4. Select entity: account
+5. Filter: statecode = 0
+6. Set field: accountcategorycode = 1
+7. Click "Update"
+8. Done!
+
+Time: ~2 minutes
+```
+
+**60x SZYBSZE!**
+
+### Instalacja
+
+```
+1. Download z https://www.xrmtoolbox.com/
+2. Extract ZIP (no installer needed - portable!)
+3. Run XrmToolBox.exe
+4. First run: Install VC++ Redistributable jeśli prompt
+```
+
+**Portable advantage:**
+
+```
+XrmToolBox/
+├── XrmToolBox.exe
+├── Plugins/            (Auto-downloaded)
+├── Connections.xml     (Saved connections)
+└── Settings.xml        (Your settings)
+
+Możesz skopiować całość na USB stick!
+Przenośne między computers!
+```
+
+### Connection Manager - centralny hub
+
+**Co to jest Connection?**
+
+Connection to zapisane credentials do Dynamics 365 environment.
+
+**Typy połączeń:**
+
+| Typ | Kiedy używać | Security |
+|-----|--------------|----------|
+| **OAuth** | Cloud (Online) | ✅ Najb bezpieczniejsze |
+| **Client Secret** | Service Principal | ✅ Dla automation |
+| **Connection String** | On-premises | ⚠️ Tylko on-prem |
+
+**Setup connection (OAuth):**
+
+```
+1. Click "Connect" button
+2. New Connection
+3. Connection Type: Microsoft Login
+4. Region: wybierz (np. Europe)
+5. Login z browser
+6. Multi-Factor Auth jeśli enabled
+7. Select organization
+8. Save connection (opcjonalnie z friendly name)
+```
+
+**Best practice: Nazywaj connections czytelnie**
+
+```
+❌ ŹLE:
+- Org123
+- Dynamics
+- Test
+
+✅ DOBRZE:
+- [DEV] Contoso Development
+- [TEST] Contoso UAT
+- [PROD] Contoso Production - READ ONLY
+
+Widzisz environment na pierwszy rzut oka!
+```
+
+### Top 15 must-have plugins
+
+#### 1. **Plugin Registration Tool** 🥇
+
+**Co robi:** Rejestruje i zarządza pluginami, steps, images.
+
+**Kiedy używasz:**
+- Deploy nowego pluginu
+- Update istniejącego
+- Configure step registration
+- Setup pre/post images
+
+**Workflow:**
+
+```
+1. Open Plugin Registration Tool
+2. Connect to org
+3. Register New Assembly
+4. Select .dll file (compiled plugin)
+5. Register New Step:
+   - Message: Create, Update, Delete, etc.
+   - Primary Entity: account, contact, etc.
+   - Stage: PreValidation, PreOperation, PostOperation
+   - Execution Mode: Synchronous / Asynchronous
+6. Register Images (if needed):
+   - PreImage: Before values
+   - PostImage: After values
+7. Save
+```
+
+**Pro tips:**
+
+```
+✅ Zawsze rejestruj steps z descriptive names:
+   "Account: Pre-Create - Set Default Category"
+   Nie: "Step1"
+
+✅ Use Filtering Attributes:
+   Jeśli plugin reaguje tylko na revenue change,
+   zaznacz tylko "revenue" attribute.
+   Plugin nie uruchomi się gdy zmienisz inne fieldy!
+   
+   HUGE performance boost!
+```
+
+#### 2. **FetchXML Builder** 🥈
+
+**Co robi:** Wizualny builder dla FetchXML queries (jak Advanced Find but steroids).
+
+**Przykład użycia:**
+
+```
+Zadanie: Znajdź accounts z revenue > 1M created this year z primary contact email
+
+Ręcznie pisać FetchXML? ~30 minut + błędy
+
+Z FetchXML Builder:
+1. Select entity: account
+2. Add attribute: name, revenue
+3. Add filter: revenue > 1000000
+4. Add filter: createdon this-year
+5. Add link: contact (primarycontactid)
+6. Add linked attribute: emailaddress1
+7. Click "Execute" - see results!
+8. Copy FetchXML - paste do kodu
+
+Time: ~2 minuty
+```
+
+**Features:**
+
+- ✅ Visual query builder
+- ✅ Execute i preview results
+- ✅ Aggregate queries support
+- ✅ Export to C# (QueryExpression conversion!)
+- ✅ Performance analysis
+
+#### 3. **Metadata Browser**
+
+**Co robi:** Browse wszystkie entity metadata (attributes, relationships, optionsets).
+
+**Dlaczego przydatne:**
+
+```
+Pytanie: "Jaka jest schema name dla Primary Contact na Account?"
+
+Bez Metadata Browser:
+1. Otwórz Dynamics web
+2. Settings → Customizations
+3. Customize System
+4. Entities → Account
+5. Fields → Primary Contact
+6. Czytaj Schema Name
+Time: ~3 minuty
+
+Z Metadata Browser:
+1. Open tool
+2. Find "account" entity
+3. Look at "primarycontactid"
+Time: ~10 sekund
+
+18x SZYBSZE!
+```
+
+**Real-world use case:**
+
+```csharp
+// Piszesz plugin i potrzebujesz:
+// - Logical name fielda
+// - Lookup target entity
+// - OptionSet values
+
+// Otwórz Metadata Browser w drugim monitorze
+// Masz wszystko pod ręką podczas kodowania!
+```
+
+#### 4. **Bulk Data Updater**
+
+**Co robi:** Mass update rekordów without code.
+
+**Scenarios:**
+
+```
+Scenario 1: Change owner dla 5000 accounts
+- Filter accounts by criteria
+- Set new owner
+- Click Update
+- Done! (3 minutes)
+
+Alternative bez tool: Write C# console app (2 hours)
+
+Scenario 2: Set default values for empty fields
+- Filter records where field IS NULL
+- Set value
+- Bulk update
+
+Scenario 3: Cleanup bad data
+- Complex filters
+- Set correct values
+- Preview before update
+```
+
+#### 5. **Solution Packager / Unpacker**
+
+**Co robi:** Export solution jako individual files (dla Git).
+
+**Problem:** Dynamics solution = 1 big XML file
+
+```
+ContosoCRM_1_0_0_0.zip
+└── solution.xml  (300 MB, 500,000 lines!)
+
+Git problems:
+❌ Merge conflicts impossible to resolve
+❌ Can't see what changed
+❌ Binary diff doesn't work
+```
+
+**Solution:** Unpack!
+
+```
+ContosoCRM/
+├── Entities/
+│   ├── account/
+│   │   ├── account.xml
+│   │   ├── forms/
+│   │   └── fields/
+│   └── contact/
+├── Workflows/
+├── Plugins/
+└── WebResources/
+
+Git benefits:
+✅ See exact changes per file
+✅ Easy merge conflicts
+✅ Meaningful diffs
+✅ Track history per component
+```
+
+**Workflow:**
+
+```
+1. Export solution from Dynamics
+2. XrmToolBox → Solution Packager
+3. Select .zip file
+4. Click "Extract"
+5. Folder created with individual files
+6. Commit to Git
+```
+
+#### 6. **User Settings Utility**
+
+**Co robi:** Mass update user settings (time zone, language, etc.).
+
+**Scenario:**
+
+```
+Company opens office in Poland.
+50 new users created.
+Need to set:
+- Language: Polish
+- Time Zone: (UTC+01:00) Warsaw
+- Currency: PLN
+
+Manual: 50 users × 2 minutes = 100 minutes
+
+With User Settings Utility:
+1. Select 50 users
+2. Set language: Polish
+3. Set timezone: Warsaw
+4. Set currency: PLN
+5. Click Apply
+Time: 1 minute
+
+100x SZYBSZE!
+```
+
+#### 7. **View Layout Replicator**
+
+**Co robi:** Copy view layouts between entities.
+
+**Use case:**
+
+```
+Stwor
+
+zyłeś perfect view dla accounts:
+- Columns: Name, Revenue, Owner, Created On
+- Sorting: Revenue DESC
+- Width: Optimal
+
+Chcesz taki sam view dla contacts, opportunities, 
+leads, etc.
+
+Manual: Recreate każdy view (10 min per view × 5 entities = 50 min)
+
+With View Layout Replicator:
+1. Select source view (account)
+2. Select target entities
+3. Click Replicate
+Time: 30 seconds
+```
+
+#### 8. **Attribute Manager**
+
+**Co robi:** Bulk operations on attributes (rename, delete, security).
+
+**Scenario:**
+
+```
+Audit findings: 200 custom fields missing field-level security!
+
+Manual fix:
+200 fields × 2 minutes = 400 minutes = 6.7 HOURS!
+
+With Attribute Manager:
+1. Select all 200 fields
+2. Set field-level security profile
+3. Apply
+Time: 2 minutes
+```
+
+#### 9. **Early Bound Generator**
+
+**Co robi:** Generate strongly-typed classes dla entities.
+
+**Dlaczego:**
+
+```csharp
+// Late-bound (bez generated classes):
+Entity account = new Entity("account");
+account["name"] = "Contoso";
+account["revenue"] = new Money(1000000);
+// Typo? account["reveneu"] - runtime error!
+
+// Early-bound (z generated classes):
+Account account = new Account();
+account.Name = "Contoso";
+account.Revenue = new Money(1000000);
+// Typo? Compile error! IntelliSense works!
+```
+
+**Usage:**
+
+```
+1. Open Early Bound Generator
+2. Select entities to generate
+3. Set namespace
+4. Click "Generate"
+5. Add .cs files to project
+6. Profit: Type-safe code!
+```
+
+#### 10. **Plugin Trace Viewer**
+
+**Co robi:** Readable view plugin trace logs.
+
+**Problem:** Dynamics trace logs = unreadable mess
+
+```
+Old way:
+1. Settings → Plugin Trace Log
+2. See raw XML
+3. Squint at tiny font
+4. Try to find your message
+```
+
+**With Plugin Trace Viewer:**
+
+```
+1. Open tool
+2. Automatic grouping by plugin
+3. Color-coded severity (Info, Warning, Error)
+4. Search/filter
+5. Click to see full stack trace
+6. Export to file
+```
+
+#### 11-15. **Honorable mentions**
+
+| Tool | Use case |
+|------|----------|
+| **SQL 4 CDS** | Run SQL queries against Dataverse! |
+| **WebResources Manager** | Bulk update web resources |
+| **Relationship Visualizer** | See entity relationships diagram |
+| **Security Role Editor** | Visual security role management |
+| **Duplicate Detection** | Find and merge duplicates |
+
+### XrmToolBox best practices
+
+#### 1. Create shortcuts for most-used tools
+
+```
+Right-click tool → "Add to My Tools"
+
+My Tools section:
+✅ Plugin Registration Tool
+✅ FetchXML Builder
+✅ Metadata Browser
+
+Quick access without scrolling!
+```
+
+#### 2. Backup przed bulk operations
+
+```
+Before mass updates:
+1. Export affected records (FetchXML Builder)
+2. Save to Excel
+3. Perform update
+4. If mistake: Restore from backup
+
+Takes 30 seconds, saves hours of panic!
+```
+
+#### 3. Use multiple instances
+
+```
+XrmToolBox is portable - you can run multiple!
+
+Instance 1: Connected to DEV
+Instance 2: Connected to TEST  
+Instance 3: Connected to PROD
+
+Side-by-side comparison!
+```
+
+---
+
+## 4.4 Power Platform CLI (pac) - Command-line automation
+
+### Czym jest Power Platform CLI?
+
+**pac** (Power Platform CLI) to command-line narzędzie od Microsoft do automatyzacji Power Platform operations.
+
+**Filozofia command-line:**
+
+```
+GUI Tools (XrmToolBox, web interface):
+✅ User-friendly
+✅ Visual feedback
+❌ Czasochłonne dla repetitive tasks
+❌ Trudne do automation
+
+Command-Line (pac):
+✅ Fast (no GUI overhead)
+✅ Scriptable (automation!)
+✅ CI/CD integration
+✅ Remote execution (SSH, Docker)
+❌ Learning curve
+```
+
+**Kiedy używać pac:**
+
+- ✅ Automation scripts
+- ✅ CI/CD pipelines (Azure DevOps, GitHub Actions)
+- ✅ Repetitive tasks (deploy 50 times per day)
+- ✅ Remote servers
+- ❌ One-off visual tasks (użyj XrmToolBox)
+
+### Instalacja
+
+**Windows:**
+
+```powershell
+# Via PowerShell (recommended)
+dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+# Verify installation
+pac
+```
+
+**macOS / Linux:**
+
+```bash
+# Install .NET SDK first
+# Then:
+dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+```
+
+**Update:**
+
+```bash
+# Update to latest version
+dotnet tool update --global Microsoft.PowerApps.CLI.Tool
+```
+
+### pac auth - connection management
+
+**Authenticate to environment:**
+
+```bash
+# Interactive login (browser opens)
+pac auth create --environment https://yourorg.crm.dynamics.com
+
+# Service Principal (automation)
+pac auth create \
+  --environment https://yourorg.crm.dynamics.com \
+  --tenant YOUR_TENANT_ID \
+  --applicationId YOUR_APP_ID \
+  --clientSecret YOUR_SECRET
+
+# Device code (headless servers)
+pac auth create --environment https://yourorg.crm.dynamics.com --deviceCode
+```
+
+**List connections:**
+
+```bash
+pac auth list
+
+# Output:
+Index  Environment                          Active
+[1]    https://dev.crm.dynamics.com        *
+[2]    https://test.crm.dynamics.com       
+[3]    https://prod.crm.dynamics.com
+```
+
+**Switch connections:**
+
+```bash
+# Switch to TEST
+pac auth select --index 2
+```
+
+**Clear auth:**
+
+```bash
+# Clear specific
+pac auth clear --index 2
+
+# Clear all
+pac auth clear
+```
+
+### pac solution - solution operations
+
+**Export solution:**
+
+```bash
+# Export as managed
+pac solution export \
+  --path ContosoCRM_1_0_0_0.zip \
+  --name ContosoCore \
+  --managed true
+
+# Export as unmanaged
+pac solution export \
+  --path ContosoCRM_1_0_0_0_unmanaged.zip \
+  --name ContosoCore \
+  --managed false
+```
+
+**Import solution:**
+
+```bash
+# Import with publish
+pac solution import \
+  --path ContosoCRM_1_0_0_0.zip \
+  --publish-changes
+
+# Import without publish (draft)
+pac solution import \
+  --path ContosoCRM_1_0_0_0.zip
+```
+
+**Pack/Unpack (for Git):**
+
+```bash
+# Unpack solution.zip → folder structure
+pac solution unpack \
+  --zipfile ContosoCRM_1_0_0_0.zip \
+  --folder ./src/solutions/ContosoCore
+
+# Pack folder → solution.zip
+pac solution pack \
+  --folder ./src/solutions/ContosoCore \
+  --zipfile ContosoCRM_1_0_0_0.zip \
+  --packagetype Managed
+```
+
+**Clone solution:**
+
+```bash
+# Download solution with dependencies
+pac solution clone \
+  --name ContosoCore \
+  --outputDirectory ./solutions \
+  --processCanvasApps
+```
+
+### pac plugin - plugin operations
+
+**Push plugin assembly:**
+
+```bash
+# Build and push plugin
+pac plugin push \
+  --assembly ./bin/Release/MyPlugins.dll
+
+# Equivalent to:
+# 1. Build solution
+# 2. Open Plugin Registration Tool
+# 3. Update Assembly
+# All in ONE command!
+```
+
+### pac webresource - web resources deployment
+
+**Push web resource:**
+
+```bash
+# Single file
+pac webresource push \
+  --file ./dist/account-form.js \
+  --name new_/scripts/account-form.js
+
+# Entire folder
+pac webresource push \
+  --folder ./dist \
+  --publish
+
+# Watch mode (auto-deploy on save)
+pac webresource push \
+  --folder ./dist \
+  --publish \
+  --watch
+```
+
+**Development workflow:**
+
+```bash
+# Terminal 1: TypeScript watch
+npm run watch
+
+# Terminal 2: Web resource auto-deploy
+pac webresource push --folder ./dist --watch
+
+# Edit TypeScript → Auto compile → Auto deploy!
+# See changes in Dynamics instantly!
+```
+
+### pac data - data operations
+
+**Export data:**
+
+```bash
+# Export records to JSON
+pac data export \
+  --fetchxml "<fetch>...</fetch>" \
+  --output ./data/accounts.json
+```
+
+**Import data:**
+
+```bash
+# Import from JSON
+pac data import \
+  --file ./data/accounts.json
+```
+
+### pac admin - admin operations
+
+**List environments:**
+
+```bash
+pac admin list
+
+# Output:
+Environment Name          ID                                   URL
+Development               xxx-xxx-xxx                          https://dev.crm...
+Test                      yyy-yyy-yyy                          https://test.crm...
+Production                zzz-zzz-zzz                          https://prod.crm...
+```
+
+**Create environment:**
+
+```bash
+pac admin create \
+  --name "Contoso Sandbox" \
+  --type Sandbox \
+  --region Europe \
+  --currency EUR
+```
+
+**Backup environment:**
+
+```bash
+pac admin backup \
+  --environment-id xxx-xxx-xxx \
+  --label "Pre-deployment backup"
+```
+
+### Automation scripts - real-world examples
+
+#### Example 1: Deploy pipeline
+
+**deploy.sh:**
+
+```bash
+#!/bin/bash
+
+# Automated deployment script
+echo "🚀 Starting deployment..."
+
+# 1. Authenticate
+echo "📡 Authenticating..."
+pac auth create \
+  --environment https://test.crm.dynamics.com \
+  --applicationId $APP_ID \
+  --clientSecret $CLIENT_SECRET \
+  --tenant $TENANT_ID
+
+# 2. Export from DEV
+echo "📦 Exporting solution from DEV..."
+pac auth select --index 1  # DEV connection
+pac solution export \
+  --path ./artifacts/solution.zip \
+  --name ContosoCore \
+  --managed true
+
+# 3. Import to TEST
+echo "⬆️ Importing to TEST..."
+pac auth select --index 2  # TEST connection
+pac solution import \
+  --path ./artifacts/solution.zip \
+  --publish-changes
+
+# 4. Run tests
+echo "🧪 Running smoke tests..."
+./run-tests.sh
+
+# 5. If tests pass, tag release
+if [ $? -eq 0 ]; then
+  echo "✅ Deployment successful!"
+  git tag "release-$(date +%Y%m%d-%H%M%S)"
+else
+  echo "❌ Tests failed! Rolling back..."
+  # Rollback logic here
+  exit 1
+fi
+```
+
+#### Example 2: Bulk web resource deploy
+
+**deploy-webresources.ps1:**
+
+```powershell
+# PowerShell script to deploy all web resources
+
+Write-Host "Deploying web resources..." -ForegroundColor Green
+
+# Compile TypeScript
+Write-Host "Compiling TypeScript..." -ForegroundColor Yellow
+npm run build
+
+# Deploy each web resource
+$webResources = @(
+    @{ File = "./dist/forms/account.js"; Name = "new_/scripts/forms/account" },
+    @{ File = "./dist/forms/contact.js"; Name = "new_/scripts/forms/contact" },
+    @{ File = "./dist/ribbons/commands.js"; Name = "new_/scripts/ribbons/commands" }
+)
+
+foreach ($resource in $webResources) {
+    Write-Host "Deploying $($resource.Name)..." -ForegroundColor Cyan
+    
+    pac webresource push `
+        --file $resource.File `
+        --name $resource.Name `
+        --publish
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ $($resource.Name) deployed" -ForegroundColor Green
+    } else {
+        Write-Host "✗ $($resource.Name) failed" -ForegroundColor Red
+        exit 1
+    }
+}
+
+Write-Host "All web resources deployed!" -ForegroundColor Green
+```
+
+### CI/CD Integration
+
+**Azure DevOps Pipeline:**
+
+```yaml
+# azure-pipelines.yml
+trigger:
+  - main
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: PowerShell@2
+  displayName: 'Install pac CLI'
+  inputs:
+    targetType: 'inline'
+    script: |
+      dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+
+- task: PowerShell@2
+  displayName: 'Export Solution'
+  inputs:
+    targetType: 'inline'
+    script: |
+      pac auth create `
+        --environment $(DYNAMICS_URL) `
+        --applicationId $(APP_ID) `
+        --clientSecret $(CLIENT_SECRET) `
+        --tenant $(TENANT_ID)
+      
+      pac solution export `
+        --path $(Build.ArtifactStagingDirectory)/solution.zip `
+        --name ContosoCore `
+        --managed true
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: 'solution'
+```
+
+**GitHub Actions:**
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Dynamics 365
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '6.0.x'
+    
+    - name: Install pac CLI
+      run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+    
+    - name: Deploy Solution
+      env:
+        DYNAMICS_URL: ${{ secrets.DYNAMICS_URL }}
+        CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+        TENANT_ID: ${{ secrets.TENANT_ID }}
+      run: |
+        pac auth create \
+          --environment $DYNAMICS_URL \
+          --applicationId $CLIENT_ID \
+          --clientSecret $CLIENT_SECRET \
+          --tenant $TENANT_ID
+        
+        pac solution import \
+          --path ./solution.zip \
+          --publish-changes
+```
+
+
+---
+
+## 4.5 Git i Version Control - współpraca w zespole
+
+### Dlaczego version control jest krytyczny?
+
+Wyobraź sobie scenariusz:
+
+**Bez version control:**
+
+```
+Piątek 16:00:
+Developer A: Zmienia plugin AccountPreCreate.cs
+Developer B: Zmienia ten sam plugin  
+Obu deploy do DEV
+
+Poniedziałek 9:00:
+Bug w production!
+Pytanie: Kto co zmienił? Kiedy? Dlaczego?
+Odpowiedź: 🤷 Nie wiemy...
+
+Próba powrotu do working version:
+- Backupy? Nie ma...
+- Historia zmian? Nie ma...
+- Poprzednia wersja? Nie ma...
+
+Result: 😱 Panic! Przepisujemy kod od nowa...
+```
+
+**Z version control (Git):**
+
+```
+Piątek 16:00:
+Developer A: git commit "Fix account validation"
+Developer B: git commit "Add revenue calculation"
+Merge conflict detected → resolve → commit
+
+Poniedziałek 9:00:
+Bug w production!
+git log → Zobacz dokładnie kto, co, kiedy zmienił
+git diff → Zobacz exact changes
+git revert → Powrót do poprzedniej wersji (30 sekund!)
+
+Result: ✅ Problem solved!
+```
+
+### Git fundamentals - jak to działa?
+
+**Model Git - snapshots over time:**
+
+```
+Commit 1: Initial plugin
+│
+├─ AccountPlugin.cs (v1)
+│  - Basic validation
+│
+▼
+
+Commit 2: Add revenue check
+│
+├─ AccountPlugin.cs (v2)
+│  - Basic validation
+│  - Revenue > 0 validation
+│
+▼
+
+Commit 3: Fix null reference
+│
+├─ AccountPlugin.cs (v3)
+│  - Basic validation
+│  - Revenue > 0 validation (FIXED)
+│
+
+Każdy commit = Complete snapshot
+Możesz wrócić do DOWOLNEGO commita!
+```
+
+**Kluczowe koncepcje:**
+
+| Koncept | Co to znaczy | Analogia |
+|---------|--------------|----------|
+| **Repository** | Folder z Git tracking | Projekt z pełną historią |
+| **Commit** | Snapshot kodu w czasie | Save game checkpoint |
+| **Branch** | Równoległa linia rozwoju | Alternate timeline |
+| **Merge** | Połączenie branches | Combine timelines |
+| **Remote** | Server z kodem (GitHub) | Cloud backup |
+| **Clone** | Kopia repo na local | Download projekt |
+| **Push** | Upload zmian do remote | Sync to cloud |
+| **Pull** | Download zmian z remote | Sync from cloud |
+
+### Instalacja Git
+
+**Windows:**
+
+```
+Download: https://git-scm.com/download/win
+Install: Default options OK
+Verify: git --version
+```
+
+**Initial configuration:**
+
+```bash
+# Set your identity
+git config --global user.name "Your Name"
+git config --global user.email "your.email@company.com"
+
+# Set default editor (Visual Studio Code)
+git config --global core.editor "code --wait"
+
+# Better diff colors
+git config --global color.ui auto
+
+# Line endings (Windows)
+git config --global core.autocrlf true
+
+# Verify config
+git config --list
+```
+
+### Git workflow dla Dynamics 365
+
+**Scenario: Nowy plugin development**
+
+**Krok 1: Clone repository**
+
+```bash
+# Clone from GitHub
+git clone https://github.com/yourorg/dynamics-plugins.git
+
+# Navigate to folder
+cd dynamics-plugins
+```
+
+**Krok 2: Create feature branch**
+
+```bash
+# Create and switch to new branch
+git checkout -b feature/account-revenue-validation
+
+# Branch naming convention:
+# feature/  - new functionality
+# bugfix/   - fixing bugs
+# hotfix/   - urgent production fixes
+```
+
+**Krok 3: Make changes**
+
+```bash
+# Edit AccountPlugin.cs in Visual Studio
+# Save changes
+
+# Check what changed
+git status
+
+# Output:
+# On branch feature/account-revenue-validation
+# Changes not staged for commit:
+#   modified:   Plugins/Account/AccountPlugin.cs
+```
+
+**Krok 4: Stage changes**
+
+```bash
+# Add specific file
+git add Plugins/Account/AccountPlugin.cs
+
+# Or add all changes
+git add .
+
+# Check staged changes
+git status
+
+# Output:
+# Changes to be committed:
+#   modified:   Plugins/Account/AccountPlugin.cs
+```
+
+**Krok 5: Commit changes**
+
+```bash
+# Commit with message
+git commit -m "Add revenue validation to Account plugin"
+
+# Better: Multi-line commit message
+git commit -m "Add revenue validation to Account plugin
+
+- Validate revenue > 0 on create
+- Validate revenue format (2 decimal places)
+- Add unit tests for validation
+- Update documentation
+
+Resolves #123"
+```
+
+**Commit message best practices:**
+
+```
+Good commit message structure:
+
+<type>: <subject> (max 50 chars)
+
+<body> (optional, detailed description)
+
+<footer> (optional, issue references)
+
+
+Types:
+- feat: New feature
+- fix: Bug fix
+- docs: Documentation
+- refactor: Code refactoring
+- test: Adding tests
+- chore: Maintenance
+
+Examples:
+✅ "feat: Add revenue validation to account plugin"
+✅ "fix: Handle null reference in contact lookup"
+✅ "refactor: Extract validation logic to helper class"
+
+❌ "fixed stuff"
+❌ "updates"
+❌ "commit"
+```
+
+**Krok 6: Push to remote**
+
+```bash
+# Push branch to GitHub
+git push origin feature/account-revenue-validation
+
+# First time push - set upstream
+git push -u origin feature/account-revenue-validation
+```
+
+**Krok 7: Create Pull Request**
+
+```bash
+# Via GitHub web interface:
+# 1. Navigate to repository
+# 2. Click "New Pull Request"
+# 3. Select: base: main ← compare: feature/account-revenue-validation
+# 4. Add title and description
+# 5. Request reviewers
+# 6. Create PR
+```
+
+**Krok 8: Code Review**
+
+```
+Reviewer comments:
+"Please add error handling for negative revenue"
+
+Make changes:
+1. Edit code
+2. git add .
+3. git commit -m "Add error handling for negative revenue"
+4. git push
+
+PR automatically updates!
+```
+
+**Krok 9: Merge**
+
+```bash
+# When approved, merge via GitHub UI
+# Or command line:
+git checkout main
+git pull origin main
+git merge feature/account-revenue-validation
+git push origin main
+```
+
+**Krok 10: Cleanup**
+
+```bash
+# Delete local branch
+git branch -d feature/account-revenue-validation
+
+# Delete remote branch
+git push origin --delete feature/account-revenue-validation
+```
+
+### Branching strategies
+
+**GitFlow - standard dla enterprise:**
+
+```mermaid
+gitGraph
+    commit id: "Initial"
+    branch develop
+    checkout develop
+    commit id: "Setup"
+    
+    branch feature/account-plugin
+    checkout feature/account-plugin
+    commit id: "Add plugin"
+    commit id: "Add tests"
+    
+    checkout develop
+    merge feature/account-plugin
+    
+    branch release/1.0
+    checkout release/1.0
+    commit id: "Version bump"
+    commit id: "Bug fixes"
+    
+    checkout main
+    merge release/1.0 tag: "v1.0"
+    
+    checkout develop
+    merge release/1.0
+```
+
+**Branches:**
+
+| Branch | Purpose | Protected | Deployed to |
+|--------|---------|-----------|-------------|
+| **main** | Production code | ✅ YES | Production |
+| **develop** | Integration branch | ✅ YES | Development |
+| **feature/** | New features | ❌ NO | Local/Dev |
+| **release/** | Release preparation | ⚠️ YES | Test/UAT |
+| **hotfix/** | Urgent fixes | ⚠️ YES | All |
+
+**Example workflow:**
+
+```bash
+# New feature
+git checkout develop
+git pull
+git checkout -b feature/new-validation
+# ... make changes ...
+git push -u origin feature/new-validation
+# Create PR to develop
+
+# Release
+git checkout develop
+git checkout -b release/1.2.0
+# ... version bump, testing ...
+git checkout main
+git merge release/1.2.0
+git tag v1.2.0
+git push --tags
+
+# Hotfix (urgent!)
+git checkout main
+git checkout -b hotfix/critical-bug
+# ... fix ...
+git checkout main
+git merge hotfix/critical-bug
+git checkout develop
+git merge hotfix/critical-bug
+```
+
+### .gitignore dla Dynamics 365
+
+**Essential .gitignore:**
+
+```gitignore
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.cache
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# NuGet
+packages/
+*.nupkg
+
+# Solution specific
+*.sln.docstates
+
+# Dynamics specific - DON'T commit these!
+Connections.xml          # XrmToolBox connections (has credentials!)
+*.pfx                    # Strong name keys (security!)
+app.config              # May contain secrets
+
+# Node modules (for web resources)
+node_modules/
+dist/
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.vscode/settings.json   # Personal settings
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+```
+
+> ⚠️ **CRITICAL**: NIGDY nie commituj credentials, connection strings, ani private keys!
+
+### Git commands reference
+
+**Daily commands:**
+
+```bash
+# Check status
+git status
+
+# See changes
+git diff                      # Unstaged changes
+git diff --staged             # Staged changes
+git diff main..feature/xyz    # Compare branches
+
+# Add changes
+git add filename.cs           # Specific file
+git add .                     # All changes
+git add -p                    # Interactive (choose hunks)
+
+# Commit
+git commit -m "message"       # Quick commit
+git commit                    # Opens editor for detailed message
+
+# Push/Pull
+git push                      # Push to remote
+git pull                      # Pull from remote
+git pull --rebase             # Pull and rebase (cleaner history)
+
+# Branches
+git branch                    # List branches
+git branch feature/xyz        # Create branch
+git checkout feature/xyz      # Switch branch
+git checkout -b feature/xyz   # Create and switch
+git branch -d feature/xyz     # Delete branch (local)
+
+# Merge
+git merge feature/xyz         # Merge branch into current
+
+# Stash (temporary save)
+git stash                     # Save work in progress
+git stash pop                 # Restore stashed work
+git stash list                # List stashes
+
+# History
+git log                       # Commit history
+git log --oneline             # Compact history
+git log --graph               # Visual graph
+git log --author="John"       # Filter by author
+git log --since="2 weeks"     # Filter by date
+
+# Undo
+git reset HEAD filename       # Unstage file
+git checkout -- filename      # Discard changes
+git revert commitHash         # Create new commit that undoes
+git reset --hard HEAD~1       # Delete last commit (DANGER!)
+```
+
+**Advanced commands:**
+
+```bash
+# Interactive rebase (cleanup history)
+git rebase -i HEAD~3          # Edit last 3 commits
+
+# Cherry-pick (copy commit from another branch)
+git cherry-pick abc123        # Apply commit abc123 to current branch
+
+# Bisect (find bug-introducing commit)
+git bisect start
+git bisect bad                # Current commit is bad
+git bisect good v1.0          # v1.0 was good
+# Git will binary search to find the bad commit
+
+# Reflog (recover lost commits)
+git reflog                    # Show all ref updates
+git reset --hard abc123       # Recover to commit abc123
+
+# Subtree (manage subprojects)
+git subtree add --prefix=lib/shared https://github.com/org/shared.git main
+
+# Worktree (multiple working directories)
+git worktree add ../hotfix main
+# Work on hotfix while keeping main branch clean
+```
+
+### Merge conflicts - rozwiązywanie
+
+**Co to jest merge conflict?**
+
+```
+Developer A:
+AccountPlugin.cs, line 50:
+    throw new InvalidPluginExecutionException("Revenue must be positive");
+
+Developer B:
+AccountPlugin.cs, line 50:
+    throw new InvalidPluginExecutionException("Revenue is required");
+
+Git: 🤔 Który wybrać? → CONFLICT!
+```
+
+**Conflict marker:**
+
+```csharp
+public void ValidateRevenue(decimal revenue)
+{
+<<<<<<< HEAD (Your changes)
+    if (revenue <= 0)
+    {
+        throw new InvalidPluginExecutionException("Revenue must be positive");
+    }
+=======
+    if (revenue == 0)
+    {
+        throw new InvalidPluginExecutionException("Revenue is required");
+    }
+>>>>>>> feature/revenue-validation (Their changes)
+}
+```
+
+**Resolution steps:**
+
+```bash
+# 1. Open file in editor
+# 2. See conflict markers (<<<<<<, =======, >>>>>>>)
+# 3. Decide which version to keep (or combine both)
+# 4. Remove conflict markers
+# 5. Save file
+
+# After resolution:
+git add AccountPlugin.cs
+git commit -m "Resolve merge conflict in revenue validation"
+```
+
+**Visual Studio conflict resolution:**
+
+```
+1. Open file with conflict
+2. VS shows: "Current Change" vs "Incoming Change"
+3. Click:
+   - "Accept Current" - keep your version
+   - "Accept Incoming" - use their version
+   - "Accept Both" - combine both
+   - "Compare" - side-by-side view
+4. Save and commit
+```
+
+### GitHub integration
+
+**Creating repository:**
+
+```bash
+# On GitHub:
+1. New Repository
+2. Name: dynamics-plugins
+3. Private (for production code)
+4. Initialize: README, .gitignore (VisualStudio)
+
+# Local:
+git clone https://github.com/yourorg/dynamics-plugins.git
+```
+
+**Pull Requests:**
+
+```
+Best practices:
+✅ Small PRs (< 400 lines changed)
+✅ Descriptive title
+✅ Detailed description:
+   - What changed?
+   - Why?
+   - How to test?
+✅ Link related issues
+✅ Request specific reviewers
+✅ Add labels (bug, enhancement, etc.)
+
+Template:
+## Summary
+Brief description of changes
+
+## Changes
+- Added revenue validation
+- Updated unit tests
+- Fixed typo in comments
+
+## Testing
+1. Create account with revenue = -100
+2. Should show error: "Revenue must be positive"
+
+## Screenshots
+(if UI changes)
+
+Resolves #123
+```
+
+**Branch protection rules:**
+
+```
+Settings → Branches → Add rule
+
+Branch name pattern: main
+
+Protection rules:
+✅ Require pull request reviews (minimum 1)
+✅ Require status checks to pass (CI/CD)
+✅ Require branches to be up to date
+✅ Include administrators (yes, even admins!)
+```
+
+### Git best practices dla Dynamics 365
+
+#### 1. Solution layering
+
+```
+Repository structure:
+dynamics-solution/
+├── Core/                     (Core solution - foundational)
+│   ├── Entities/
+│   ├── Plugins/
+│   └── solution.xml
+├── Sales/                    (Sales solution - depends on Core)
+│   ├── Entities/
+│   ├── Plugins/
+│   └── solution.xml
+└── Service/                  (Service solution - depends on Core)
+    ├── Entities/
+    ├── Plugins/
+    └── solution.xml
+
+Each solution in separate folder
+Clear dependencies
+Independent versioning
+```
+
+#### 2. Commit frequency
+
+```
+❌ ŹLE:
+End of day: git commit -m "today's work" (500 files changed)
+
+✅ DOBRZE:
+Every logical change:
+- 10:00: git commit -m "Add account validation"
+- 11:30: git commit -m "Add unit tests for validation"
+- 14:00: git commit -m "Fix edge case in validation"
+- 16:00: git commit -m "Update documentation"
+
+Small, atomic commits!
+```
+
+#### 3. Don't commit binaries
+
+```
+❌ DON'T commit:
+- .dll files (compiled assemblies)
+- .zip files (solutions exports)
+- Large PDFs
+- Videos/images (unless absolutely necessary)
+
+✅ DO commit:
+- Source code (.cs, .ts, .js)
+- Configuration files (.json, .xml)
+- Documentation (.md)
+- Small images (icons, logos < 100KB)
+
+Binaries → Artifacts storage (Azure Artifacts, GitHub Releases)
+```
+
+---
+
+## Ćwiczenia praktyczne
+
+### Ćwiczenie 1: Visual Studio Setup (Junior)
+
+**Zadanie:** Skonfiguruj profesjonalne środowisko VS
+
+1. Zainstaluj Visual Studio Community 2022
+2. Dodaj workload: .NET desktop development
+3. Zainstaluj NuGet packages:
+   - Microsoft.CrmSdk.CoreAssemblies
+   - Microsoft.CrmSdk.Workflow
+4. Stwórz projekt plugin z proper strukturą folderów
+5. Dodaj snippet dla plugin boilerplate
+6. Skonfiguruj .gitignore
+
+**Weryfikacja:**
+- [ ] Plugin project kompiluje się bez błędów
+- [ ] IntelliSense działa dla IOrganizationService
+- [ ] Git ignoruje bin/obj folders
+
+### Ćwiczenie 2: XrmToolBox mastery (Mid)
+
+**Zadanie:** Zaawansowane operacje XrmToolBox
+
+1. Zainstaluj XrmToolBox i 10 essential plugins
+2. Stwórz connection do trial environment
+3. Użyj FetchXML Builder:
+   - Query: Accounts z revenue > 100K created this year
+   - Include primary contact
+   - Export do QueryExpression
+4. Użyj Metadata Browser:
+   - Find all lookup fields na Account
+   - Export lista do Excel
+5. Użyj Plugin Registration Tool:
+   - Zarejestruj test plugin
+   - Configure pre-image
+
+### Ćwiczenie 3: pac CLI Automation (Mid)
+
+**Zadanie:** Stwórz deployment script
+
+Napisz PowerShell script który:
+1. Authenticates do environment
+2. Exports solution (ContosoCore)
+3. Unpacks do folder structure
+4. Displays summary:
+   - Number of entities
+   - Number of plugins
+   - Number of web resources
+
+**Template:**
+
+```powershell
+# deploy.ps1
+param(
+    [string]$Environment,
+    [string]$SolutionName
+)
+
+# TODO: Implement
+```
+
+### Ćwiczenie 4: Git Workflow (Senior)
+
+**Zadanie:** Complete Git workflow
+
+1. Clone repository
+2. Create feature branch: `feature/account-validation`
+3. Make changes to AccountPlugin.cs:
+   - Add revenue validation
+   - Add unit tests
+4. Commit changes (proper message)
+5. Push to remote
+6. Create Pull Request
+7. Simulate code review feedback
+8. Make requested changes
+9. Merge PR
+
+**Deliverable:** Screenshot PR z code review comments
+
+### Ćwiczenie 5: CI/CD Pipeline (Senior)
+
+**Zadanie:** Setup automation pipeline
+
+Stwórz GitHub Actions workflow który:
+1. Triggers on push to main
+2. Installs pac CLI
+3. Authenticates to Dynamics (using secrets)
+4. Exports solution
+5. Publishes artifact
+6. (Bonus) Imports to TEST environment if tests pass
+
+**Template:** Zobacz sekcję 4.4 "CI/CD Integration"
+
+---
+
+## Checklist przed przejściem do Części II
+
+### Visual Studio
+- [ ] **Zainstalowany i skonfigurowany**
+  - [ ] VS Community/Professional/Enterprise
+  - [ ] .NET desktop development workload
+  - [ ] NuGet packages (CrmSdk)
+  
+- [ ] **IntelliSense i productivity**
+  - [ ] IntelliSense działa dla Dynamics types
+  - [ ] Znasz shortcuts (F12, Ctrl+., Ctrl+K Ctrl+D)
+  - [ ] Potrafisz używać debuggera
+  
+- [ ] **Project structure**
+  - [ ] Rozumiesz recommended folder structure
+  - [ ] Używasz proper namespaces
+  - [ ] Masz unit tests project
+
+### VS Code
+- [ ] **Setup dla TypeScript/JavaScript**
+  - [ ] VS Code zainstalowany
+  - [ ] Power Platform Extension
+  - [ ] ESLint i Prettier
+  
+- [ ] **TypeScript development**
+  - [ ] tsconfig.json configured
+  - [ ] @types/xrm installed
+  - [ ] Build i deploy workflow działa
+
+### XrmToolBox
+- [ ] **Essential plugins zainstalowane**
+  - [ ] Plugin Registration Tool
+  - [ ] FetchXML Builder
+  - [ ] Metadata Browser
+  - [ ] 5+ innych useful plugins
+  
+- [ ] **Używasz regularnie**
+  - [ ] Connections saved
+  - [ ] Favorite tools w "My Tools"
+  - [ ] Backups before bulk operations
+
+### Power Platform CLI
+- [ ] **pac zainstalowany i skonfigurowany**
+  - [ ] `pac` command działa
+  - [ ] Auth connections created
+  - [ ] Rozumiesz wszystkie subcommands
+  
+- [ ] **Automation**
+  - [ ] Napisałeś przynajmniej 1 script
+  - [ ] Rozumiesz CI/CD integration
+  - [ ] Potrafisz deploy solution via CLI
+
+### Git
+- [ ] **Podstawy opanowane**
+  - [ ] Git zainstalowany i configured
+  - [ ] Rozumiesz: commit, branch, merge, push, pull
+  - [ ] Potrafisz rozwiązać merge conflicts
+  
+- [ ] **Workflow**
+  - [ ] Feature branch workflow
+  - [ ] Pull Requests
+  - [ ] Code review process
+  
+- [ ] **Best practices**
+  - [ ] .gitignore configured
+  - [ ] Atomic commits
+  - [ ] Descriptive commit messages
+  - [ ] NIGDY nie commituj credentials
+
+### Productivity
+- [ ] **Keyboard shortcuts**
+  - [ ] Znasz 10+ VS shortcuts
+  - [ ] Używasz zamiast myszy gdy możliwe
+  
+- [ ] **Automation**
+  - [ ] Scripts dla repetitive tasks
+  - [ ] Build automation
+  - [ ] Deployment automation
+
+---
+
+## Podsumowanie rozdziału
+
+W tym rozdziale poznałeś kompletny warsztat narzędzi Dynamics 365 developera:
+
+✅ **Visual Studio** - C# plugin development IDE  
+✅ **VS Code** - TypeScript/JavaScript editor  
+✅ **XrmToolBox** - 200+ community tools  
+✅ **pac CLI** - Command-line automation  
+✅ **Git** - Version control i collaboration  
+
+### Kluczowe wnioski:
+
+> 💡 **Narzędzia = Efektywność** - Dobry developer zna swoje tools
+
+> 💡 **Automation > Manual** - Scriptuj repetitive tasks
+
+> 💡 **Git is mandatory** - Nie wyobrażam sobie pracy bez version control
+
+> 💡 **Learn shortcuts** - 100+ godzin zaoszczędzonych rocznie
+
+> 💡 **Community tools** - XrmToolBox ma tool dla prawie wszystkiego
+
+### ROI narzędzi:
+
+```
+Time invested: ~8 hours (learning all tools)
+Time saved per week: ~5 hours
+Break-even: ~1.6 weeks
+Annual savings: 250 hours = 6+ TYGODNI pracy!
+```
+
+### Co dalej?
+
+Gratulacje! **CZĘŚĆ I: FUNDAMENTY PROGRAMISTYCZNE UKOŃCZONA!** 🎉
+
+Masz teraz solidne fundamenty:
+- C# programming (Rozdział 1)
+- TypeScript/JavaScript (Rozdział 2)
+- SQL i queries (Rozdział 3)
+- Developer tools (Rozdział 4)
+
+W **CZĘŚCI II: CORE DYNAMICS 365 DEVELOPMENT** przejdziemy do praktyki:
+
+**Rozdział 5: Plugin Development** - Event Pipeline, Execution Context, Best Practices
+
+Zobaczymy się tam! 👋
+
+---
+
