@@ -4970,3 +4970,431 @@ function onAccountFormSave(executionContext: any): void {
 ---
 
 [KONIEC ROZDZIAŁU 2 - CZĘŚĆ 1]
+
+---
+
+## Ćwiczenia praktyczne
+
+### Ćwiczenie 1: TypeScript Basics (Junior)
+
+**Zadanie:** Stwórz system typowania dla Dynamics entities
+
+1. Zdefiniuj interfaces dla: Account, Contact, Opportunity
+2. Dodaj EntityReference, OptionSetValue, Money types
+3. Stwórz union type dla wszystkich entity types
+4. Napisz type guard function `isAccount()`, `isContact()`
+
+```typescript
+// Twoje rozwiązanie tutaj
+interface Account {
+    // TODO: Define Account interface
+}
+
+interface Contact {
+    // TODO: Define Contact interface
+}
+
+function isAccount(entity: any): entity is Account {
+    // TODO: Implement type guard
+}
+```
+
+**Rozwiązanie:**
+<details>
+<summary>Kliknij aby zobaczyć rozwiązanie</summary>
+
+```typescript
+interface EntityReference {
+    id: string;
+    logicalName: string;
+    name?: string;
+}
+
+interface OptionSetValue {
+    value: number;
+    label?: string;
+}
+
+interface Money {
+    value: number;
+}
+
+interface BaseEntity {
+    id: string;
+    logicalName: string;
+}
+
+interface Account extends BaseEntity {
+    logicalName: "account";
+    name: string;
+    revenue?: Money;
+    primarycontactid?: EntityReference;
+}
+
+interface Contact extends BaseEntity {
+    logicalName: "contact";
+    firstname: string;
+    lastname: string;
+    emailaddress1?: string;
+}
+
+interface Opportunity extends BaseEntity {
+    logicalName: "opportunity";
+    name: string;
+    estimatedvalue?: Money;
+    customerid?: EntityReference;
+}
+
+type DynamicsEntity = Account | Contact | Opportunity;
+
+function isAccount(entity: DynamicsEntity): entity is Account {
+    return entity.logicalName === "account";
+}
+
+function isContact(entity: DynamicsEntity): entity is Contact {
+    return entity.logicalName === "contact";
+}
+
+function isOpportunity(entity: DynamicsEntity): entity is Opportunity {
+    return entity.logicalName === "opportunity";
+}
+
+// Usage
+function processEntity(entity: DynamicsEntity): void {
+    if (isAccount(entity)) {
+        console.log(`Account: ${entity.name}, Revenue: ${entity.revenue?.value}`);
+    } else if (isContact(entity)) {
+        console.log(`Contact: ${entity.firstname} ${entity.lastname}`);
+    } else if (isOpportunity(entity)) {
+        console.log(`Opportunity: ${entity.name}, Value: ${entity.estimatedvalue?.value}`);
+    }
+}
+```
+</details>
+
+---
+
+### Ćwiczenie 2: Async/Await (Mid)
+
+**Zadanie:** Stwórz Web API helper z error handling
+
+1. Implementuj `DynamicsAPI` class z metodami CRUD
+2. Dodaj retry logic (max 3 attempts)
+3. Dodaj timeout (5 seconds)
+4. Obsłuż błędy HTTP (400, 401, 404, 500)
+5. Zwracaj typowane responses
+
+```typescript
+class DynamicsAPI {
+    async create<T>(entitySetName: string, entity: T): Promise<string> {
+        // TODO: Implement with retry and timeout
+    }
+    
+    async retrieve<T>(entitySetName: string, id: string): Promise<T> {
+        // TODO: Implement with error handling
+    }
+}
+```
+
+**Wymagania:**
+- Użyj async/await (nie `.then()`)
+- Implementuj retry z exponential backoff
+- Typuj wszystkie responses
+- Obsłuż edge cases (network errors, timeouts)
+
+---
+
+### Ćwiczenie 3: DOM Manipulation (Mid)
+
+**Zadanie:** Stwórz dynamiczną listę accounts z event delegation
+
+1. Stwórz funkcję `renderAccountsList(accounts: Account[])`
+2. Wyświetl każdy account jako card z: name, revenue, edit button, delete button
+3. Użyj event delegation dla click handlers
+4. Dodaj search/filter functionality
+5. Dodaj loading state
+
+**Funkcje do zaimplementowania:**
+```typescript
+function renderAccountsList(accounts: Account[]): void {
+    // TODO: Render accounts as cards
+}
+
+function setupEventDelegation(): void {
+    // TODO: Single event listener for all buttons
+}
+
+function filterAccounts(searchTerm: string): void {
+    // TODO: Filter and re-render
+}
+
+function showLoading(show: boolean): void {
+    // TODO: Show/hide spinner
+}
+```
+
+**Bonus:** Dodaj pagination (10 items per page)
+
+---
+
+### Ćwiczenie 4: Form Scripting (Senior)
+
+**Zadanie:** Stwórz kompletny form handler dla Account
+
+**Wymagania:**
+1. **OnLoad:**
+   - Załaduj related contacts asynchronously
+   - Setup field requirements based on category
+   - Hide/show fields based on form type
+   
+2. **OnChange (revenue):**
+   - Jeśli revenue > $1M, set category to "Enterprise"
+   - Show warning notification
+   - Call external API to verify large amounts
+   
+3. **OnSave:**
+   - Validate required fields
+   - Prevent save if validation fails
+   - Show progress indicator during save
+
+4. **Type Safety:**
+   - Wszystkie operations typowane
+   - Używaj proper interfaces dla form context
+   - No `any` types!
+
+```typescript
+class AccountFormHandler {
+    constructor(private formContext: FormContext) {}
+    
+    async onLoad(): Promise<void> {
+        // TODO: Implement
+    }
+    
+    async onRevenueChange(): Promise<void> {
+        // TODO: Implement
+    }
+    
+    onSave(saveEvent: any): void {
+        // TODO: Implement
+    }
+}
+```
+
+---
+
+### Ćwiczenie 5: Advanced Patterns (Senior)
+
+**Zadanie:** Implementuj Repository Pattern z caching
+
+Stwórz generic repository który:
+1. Obsługuje CRUD operations
+2. Cache'uje wyniki (in-memory)
+3. Automatycznie invaliduje cache po update/delete
+4. Implementuje retry logic
+5. Jest fully typed
+
+```typescript
+interface CacheOptions {
+    ttl: number; // Time to live in milliseconds
+    maxSize: number;
+}
+
+class CachedRepository<T extends BaseEntity> {
+    private cache: Map<string, { data: T; timestamp: number }>;
+    
+    constructor(
+        private entitySetName: string,
+        private cacheOptions: CacheOptions
+    ) {
+        this.cache = new Map();
+    }
+    
+    async retrieve(id: string): Promise<T> {
+        // TODO: Check cache first, then fetch if needed
+    }
+    
+    async create(entity: T): Promise<string> {
+        // TODO: Create and invalidate cache
+    }
+    
+    async update(id: string, changes: Partial<T>): Promise<void> {
+        // TODO: Update and invalidate cache
+    }
+    
+    private invalidateCache(id: string): void {
+        // TODO: Remove from cache
+    }
+    
+    private cleanExpiredCache(): void {
+        // TODO: Remove expired entries
+    }
+}
+```
+
+**Bonus:** Dodaj statistics (cache hit rate, miss rate)
+
+---
+
+## Checklist przed przejściem do Rozdziału 3
+
+Przed przejściem do następnego rozdziału upewnij się że:
+
+### TypeScript Fundamentals
+- [ ] **Rozumiesz podstawowe typy**
+  - [ ] Znasz różnicę między `string`, `number`, `boolean`
+  - [ ] Potrafisz używać `any` vs `unknown` właściwie
+  - [ ] Rozumiesz `null` vs `undefined`
+  
+- [ ] **Opanowałeś interfaces**
+  - [ ] Potrafisz stworzyć interface dla entity
+  - [ ] Rozumiesz optional properties (`?`)
+  - [ ] Wiesz jak używać `readonly`
+  - [ ] Potrafisz extend interfaces
+
+- [ ] **Znasz union types i type guards**
+  - [ ] Potrafisz stworzyć union type
+  - [ ] Umiesz napisać custom type guard
+  - [ ] Rozumiesz discriminated unions
+
+### Modern JavaScript (ES6+)
+- [ ] **Arrow functions**
+  - [ ] Rozumiesz różnicę w `this` binding
+  - [ ] Potrafisz używać concise syntax
+  - [ ] Wiesz kiedy używać arrow vs traditional function
+
+- [ ] **Destructuring**
+  - [ ] Potrafisz destructure objects
+  - [ ] Potrafisz destructure arrays
+  - [ ] Umiesz używać rest operator (`...`)
+  - [ ] Rozumiesz nested destructuring
+
+- [ ] **Spread operator**
+  - [ ] Potrafisz merge objects
+  - [ ] Potrafisz copy arrays
+  - [ ] Umiesz używać w function parameters
+
+- [ ] **Template literals**
+  - [ ] Potrafisz interpolować variables
+  - [ ] Umiesz tworzyć multi-line strings
+  - [ ] Rozumiesz tagged templates
+
+### Asynchronous Programming
+- [ ] **Promises**
+  - [ ] Rozumiesz Promise states
+  - [ ] Potrafisz tworzyć Promises
+  - [ ] Umiesz chain promises
+  - [ ] Wiesz jak obsłużyć errors
+
+- [ ] **Async/Await**
+  - [ ] Potrafisz konwertować Promise chains do async/await
+  - [ ] Umiesz obsłużyć errors z try/catch
+  - [ ] Rozumiesz Promise.all vs Promise.race
+  - [ ] Unikasz common pitfalls (async void, blocking)
+
+- [ ] **Error Handling**
+  - [ ] Implementujesz retry logic
+  - [ ] Obsługujesz timeouts
+  - [ ] Logujesz errors properly
+  - [ ] Używasz circuit breaker pattern gdzie potrzeba
+
+### DOM Manipulation
+- [ ] **Selectors**
+  - [ ] Znasz różnicę getElementById vs querySelector
+  - [ ] Potrafisz używać querySelectorAll
+  - [ ] Rozumiesz NodeList vs Array
+
+- [ ] **Event Handling**
+  - [ ] Potrafisz dodawać/usuwać event listeners
+  - [ ] Rozumiesz event delegation
+  - [ ] Wiesz jak prevent default behavior
+  - [ ] Umiesz handle różne event types
+
+- [ ] **Element Manipulation**
+  - [ ] Potrafisz tworzyć elements dynamically
+  - [ ] Umiesz modyfikować attributes i styles
+  - [ ] Rozumiesz classList API
+  - [ ] Wiesz jak safely manipulate innerHTML
+
+### Dynamics 365 Specific
+- [ ] **Web API**
+  - [ ] Potrafisz wykonać CRUD operations
+  - [ ] Umiesz budować OData queries
+  - [ ] Rozumiesz authentication headers
+  - [ ] Wiesz jak handle pagination
+
+- [ ] **Form Scripting**
+  - [ ] Znasz form context API
+  - [ ] Potrafisz get/set attribute values
+  - [ ] Umiesz show/hide controls
+  - [ ] Rozumiesz form events (OnLoad, OnSave, OnChange)
+
+- [ ] **Type Safety**
+  - [ ] Typujesz wszystkie Dynamics entities
+  - [ ] Używasz interfaces dla form context
+  - [ ] Unikasz `any` gdzie możliwe
+  - [ ] Implementujesz type guards
+
+### Best Practices
+- [ ] **Code Quality**
+  - [ ] Używasz TypeScript strict mode
+  - [ ] Kod jest properly formatted
+  - [ ] No console errors w browser
+  - [ ] Wszystkie promises są handled
+
+- [ ] **Error Handling**
+  - [ ] Wszystkie async operations w try/catch
+  - [ ] User-friendly error messages
+  - [ ] Proper logging
+  - [ ] Graceful degradation
+
+- [ ] **Performance**
+  - [ ] Unikasz memory leaks (event listeners removed)
+  - [ ] Używasz event delegation
+  - [ ] Cache'ujesz where appropriate
+  - [ ] Debounce/throttle expensive operations
+
+### Praktyka
+- [ ] **Ćwiczenia**
+  - [ ] Ukończyłeś wszystkie 5 ćwiczeń
+  - [ ] Przetestowałeś kod w browser
+  - [ ] Rozumiesz wszystkie przykłady
+  - [ ] Eksperymentowałeś samodzielnie
+
+---
+
+## Podsumowanie rozdziału
+
+W tym rozdziale poznałeś TypeScript i JavaScript w kontekście Power Platform:
+
+✅ **TypeScript Basics** - types, interfaces, unions, type guards, type safety  
+✅ **ES6+ Features** - arrow functions, destructuring, spread, template literals  
+✅ **Async/Await** - promises, error handling, retry patterns, circuit breaker  
+✅ **DOM Manipulation** - selectors, events, element creation, event delegation  
+✅ **Type Safety** - entity interfaces, form context typing, generic repositories  
+
+### Kluczowe wnioski:
+
+> 💡 **TypeScript to must-have** - Type safety łapie błędy przed runtime
+
+> 💡 **Async/await > Promises** - Czytelniejszy i łatwiejszy w maintenance
+
+> 💡 **Event delegation** - Jeden listener zamiast setki
+
+> 💡 **Type wszystko** - No `any`, używaj proper interfaces
+
+> 💡 **Error handling is critical** - Zawsze obsługuj async errors
+
+### Typowe pułapki do unikania:
+
+❌ **Nie używaj `any`** - Tracisz type safety  
+❌ **Nie ignoruj Promise rejections** - Unhandled rejections crashują app  
+❌ **Nie dodawaj event listeners bez cleanup** - Memory leaks!  
+❌ **Nie blokuj z `.wait()` lub `.Result`** - Deadlocks w async code  
+❌ **Nie manipuluj DOM bez type guards** - `null` reference errors  
+
+### Co dalej?
+
+W **Rozdziale 3** poznasz **SQL i zapytania w Dynamics** - FetchXML, QueryExpression, optymalizację zapytań i best practices dla Dataverse.
+
+---
+
