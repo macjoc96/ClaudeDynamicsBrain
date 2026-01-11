@@ -5398,3 +5398,2651 @@ W **Rozdziale 3** poznasz **SQL i zapytania w Dynamics** - FetchXML, QueryExpres
 
 ---
 
+
+---
+
+# Rozdział 3: SQL i zapytania w Dynamics 365
+
+## Wprowadzenie
+
+Zapytania do bazy danych są fundamentem każdej aplikacji biznesowej. W Dynamics 365 mamy do czynienia z unikalną sytuacją - platformą która powstała z ewolucji tradycyjnych relacyjnych baz danych (SQL Server) w kierección nowoczesnego cloud-native data store (Dataverse). To powoduje, że developers muszą rozumieć **trzy różne sposoby zapytań**: klasyczny SQL (jako punkt odniesienia), FetchXML (XML-based query language) oraz QueryExpression (programmatic API).
+
+### Dlaczego trzy różne sposoby?
+
+To pytanie często zadają początkujący developerzy. Odpowiedź kryje się w **historii i architekturze** platformy:
+
+```mermaid
+graph TD
+    A[2003: Microsoft CRM 1.0] -->|Bazuje na SQL Server| B[SQL Queries]
+    B -->|2007: Potrzeba abstrakcji| C[FetchXML introduced]
+    C -->|2011: SDK dla developerów| D[QueryExpression API]
+    D -->|2020: Power Platform| E[Dataverse - wszystkie 3 metody]
+    
+    style E fill:#90EE90
+```
+
+**Historyczne powody:**
+- **SQL** - Bezpośrednie zapytania, ale wymagają dostępu do bazy (security risk)
+- **FetchXML** - Abstrakcja umożliwiająca cross-platform queries (on-premises i cloud)
+- **QueryExpression** - Type-safe API dla C# developers
+
+**Współczesne zastosowania:**
+
+| Metoda | Kiedy używać | Zalety | Wady |
+|--------|--------------|--------|------|
+| **SQL** | Analytics, reporting (read-only) | Znajomy syntax, powerful | Brak dostępu w cloud, security issues |
+| **FetchXML** | Advanced queries, reports, charts | Wizualne narzędzia, potężny | XML verbosity |
+| **QueryExpression** | C# plugins, server-side logic | Type-safe, IntelliSense | Więcej kodu |
+
+### Czego się nauczysz?
+
+W tym rozdziale dogłębnie poznasz:
+
+1. **Podstawy SQL** - jako punkt odniesienia i zrozumienie relacyjnych baz danych
+2. **FetchXML** - architektura, składnia, zaawansowane operacje
+3. **QueryExpression** - programmatic queries, type safety
+4. **Optymalizacja** - indeksy, performance tuning, best practices
+5. **Praktyczne porównania** - kiedy co używać i dlaczego
+
+> 💡 **WAŻNE**: Nawet jeśli znasz SQL, **musisz** nauczyć się FetchXML i QueryExpression. W Dynamics 365 cloud nie masz bezpośredniego dostępu do SQL Server - wszystkie queries idą przez Dataverse API.
+
+---
+
+## 3.1 Podstawy SQL i model relacyjny - fundamenty teorii baz danych
+
+### Czym właściwie jest baza danych?
+
+Zacznijmy od podstaw. **Baza danych** to zorganizowany zbiór danych przechowywany elektronicznie. Ale to tylko sucha definicja. W praktyce, baza danych to:
+
+**Analogia do biblioteki:**
+Wyobraź sobie bibliotekę z milionami książek. Bez systemu katalogowania znalezienie konkretnej książki byłoby niemożliwe. Baza danych to:
+- **Książki** = Rekordy (wiersze)
+- **Katalogi tematyczne** = Tabele
+- **System Dewey'a** = Relacje między tabelami
+- **Bibliotekarz** = Database Management System (DBMS)
+- **Karta biblioteczna** = Klucz główny (Primary Key)
+
+### Model relacyjny - fundament Dynamics 365
+
+Microsoft Dynamics 365 (a dokładniej Dataverse) bazuje na **modelu relacyjnym** zaproponowanym przez Edgara F. Codda w 1970 roku. Model ten opiera się na kilku fundamentalnych koncepcjach:
+
+#### 1. Tabele (Relations)
+
+Tabela to dwuwymiarowa struktura składająca się z wierszy i kolumn.
+
+```
+Tabela: ACCOUNTS (Konta firm)
+┌────────────┬─────────────────────┬──────────────┬────────────────┐
+│ AccountID  │ Name                │ Revenue      │ CategoryCode   │
+├────────────┼─────────────────────┼──────────────┼────────────────┤
+│ A001       │ Contoso Ltd         │ 1,000,000    │ 1 (Enterprise) │
+│ A002       │ Fabrikam Inc        │ 500,000      │ 2 (Standard)   │
+│ A003       │ Adventure Works     │ 750,000      │ 1 (Enterprise) │
+└────────────┴─────────────────────┴──────────────┴────────────────┘
+```
+
+**Terminologia:**
+- **Wiersz (Row/Record/Tuple)** - Pojedynczy rekord, np. jeden account "Contoso Ltd"
+- **Kolumna (Column/Field/Attribute)** - Właściwość, np. "Name" lub "Revenue"
+- **Klucz główny (Primary Key)** - Unikalna wartość identyfikująca wiersz (AccountID)
+- **Schemat (Schema)** - Definicja struktury tabeli
+
+> 📌 **UWAGA**: W Dynamics 365 zamiast "Table" mówimy **"Entity"**, zamiast "Column" mówimy **"Attribute"**, a zamiast "Row" mówimy **"Record"**. To tylko inna nomenklatura dla tych samych koncepcji!
+
+#### 2. Relacje (Relationships)
+
+Relacje łączą tabele poprzez klucze. Istnieją trzy typy relacji:
+
+**A) One-to-Many (1:N) - Jeden do wielu**
+
+Najczęstsza relacja w Dynamics. Jeden account może mieć wiele contacts:
+
+```mermaid
+erDiagram
+    ACCOUNT ||--o{ CONTACT : has
+    ACCOUNT {
+        guid AccountID PK
+        string Name
+        decimal Revenue
+    }
+    CONTACT {
+        guid ContactID PK
+        guid ParentCustomerID FK
+        string FirstName
+        string LastName
+    }
+```
+
+**Wyjaśnienie:**
+- Account (1) : Contact (N)
+- Jeden account może mieć 0, 1 lub wiele kontaktów
+- Każdy contact należy do dokładnie jednego account
+- **Foreign Key (FK)** w tabeli Contact (ParentCustomerID) wskazuje na Primary Key w Account
+
+**B) Many-to-Many (N:N) - Wiele do wielu**
+
+Relacja gdzie wiele rekordów z jednej tabeli może być powiązanych z wieloma rekordami z drugiej tabeli.
+
+Przykład: Contacts i Marketing Lists (kontakty mogą należeć do wielu list, listy mogą mieć wiele kontaktów)
+
+```mermaid
+erDiagram
+    CONTACT }o--o{ MARKETINGLIST : "member of"
+    CONTACT {
+        guid ContactID PK
+        string FullName
+    }
+    MARKETINGLIST {
+        guid ListID PK
+        string ListName
+    }
+    CONTACT_MARKETINGLIST {
+        guid ContactID FK
+        guid ListID FK
+    }
+```
+
+**Jak to działa pod maską:**
+Many-to-Many wymaga **tabeli pośredniczącej** (intersection table):
+
+```
+Tabela: CONTACT_MARKETINGLIST (invisible to users)
+┌────────────┬────────────┐
+│ ContactID  │ ListID     │
+├────────────┼────────────┤
+│ C001       │ L001       │  <- Contact C001 jest na liście L001
+│ C001       │ L002       │  <- Contact C001 jest też na L002
+│ C002       │ L001       │  <- Contact C002 jest na L001
+└────────────┴────────────┘
+```
+
+> 💡 **TIP**: W Dynamics 365 tabele N:N są automatycznie zarządzane przez system. Nie musisz się nimi martwić - platforma robi to za Ciebie!
+
+**C) One-to-One (1:1) - Jeden do jeden**
+
+Rzadka w Dynamics, używana do dzielenia dużych tabel lub separacji danych wrażliwych.
+
+#### 3. Normalizacja - dlaczego nie trzymamy wszystkiego w jednej tabeli?
+
+**Problem bez normalizacji:**
+
+```
+Źle zaprojektowana tabela: ORDERS (bez normalizacji)
+┌─────────┬──────────────┬────────────────┬──────────────┬────────────────┐
+│ OrderID │ CustomerName │ CustomerPhone  │ ProductName  │ ProductPrice   │
+├─────────┼──────────────┼────────────────┼──────────────┼────────────────┤
+│ O001    │ John Doe     │ 555-0100       │ Widget       │ 10.00          │
+│ O002    │ John Doe     │ 555-0100       │ Gadget       │ 15.00          │
+│ O003    │ Jane Smith   │ 555-0200       │ Widget       │ 10.00          │
+└─────────┴──────────────┴────────────────┴──────────────┴────────────────┘
+```
+
+**Problemy:**
+1. **Redundancja** - "John Doe" i "555-0100" powtarza się
+2. **Update anomaly** - Jeśli John zmieni numer, trzeba update wszystkie wiersze
+3. **Delete anomaly** - Usunięcie ostatniego zamówienia usuwa info o kliencie
+4. **Insert anomaly** - Nie można dodać klienta bez zamówienia
+
+**Rozwiązanie: Normalizacja do 3NF (Third Normal Form)**
+
+```
+Tabela: CUSTOMERS
+┌────────────┬──────────────┬────────────────┐
+│ CustomerID │ CustomerName │ CustomerPhone  │
+├────────────┼──────────────┼────────────────┤
+│ C001       │ John Doe     │ 555-0100       │
+│ C002       │ Jane Smith   │ 555-0200       │
+└────────────┴──────────────┴────────────────┘
+
+Tabela: PRODUCTS
+┌───────────┬─────────────┬──────────┐
+│ ProductID │ ProductName │ Price    │
+├───────────┼─────────────┼──────────┤
+│ P001      │ Widget      │ 10.00    │
+│ P002      │ Gadget      │ 15.00    │
+└───────────┴─────────────┴──────────┘
+
+Tabela: ORDERS
+┌─────────┬────────────┬───────────┐
+│ OrderID │ CustomerID │ ProductID │
+├─────────┼────────────┼───────────┤
+│ O001    │ C001       │ P001      │
+│ O002    │ C001       │ P002      │
+│ O003    │ C002       │ P001      │
+└─────────┴────────────┴───────────┘
+```
+
+**Korzyści:**
+- ✅ Każdy fact przechowywany raz
+- ✅ Łatwe update (jeden wiersz)
+- ✅ Brak anomalii
+- ✅ Oszczędność miejsca
+
+> 📌 **W Dynamics 365**: Dataverse automatycznie stosuje normalizację. Gdy tworzysz lookup field (np. Primary Contact na Account), tworzysz relację 1:N między tabelami.
+
+### SQL - język zapytań (Structured Query Language)
+
+SQL to **deklaratywny język** - mówisz "CO chcesz uzyskać", nie "JAK to zrobić". Database engine sam optymalizuje wykonanie.
+
+#### Podstawowa składnia SELECT
+
+```sql
+SELECT [columns]
+FROM [table]
+WHERE [conditions]
+ORDER BY [columns]
+```
+
+**Anatomia zapytania SQL:**
+
+```sql
+SELECT 
+    name,                    -- 1. CO chcesz pobrać (kolumny)
+    revenue,
+    numberofemployees
+FROM 
+    accounts                 -- 2. SKĄD (z jakiej tabeli)
+WHERE 
+    revenue > 1000000        -- 3. JAKIE warunki (filtrowanie)
+    AND statecode = 0        -- AND = oba warunki muszą być spełnione
+ORDER BY 
+    revenue DESC             -- 4. JAK posortować (DESC = malejąco)
+```
+
+**Krok po kroku - co się dzieje:**
+
+1. **FROM** - Database engine identyfikuje tabelę źródłową
+2. **WHERE** - Filtruje wiersze (przed agregacją)
+3. **SELECT** - Wybiera kolumny do zwrócenia
+4. **ORDER BY** - Sortuje rezultaty
+
+> ⚠️ **WAŻNE**: Kolejność klauzul w SQL jest STAŁA:
+> `SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY`
+> Nie możesz napisać `FROM WHERE SELECT` - to syntax error!
+
+#### JOIN - łączenie tabel
+
+JOIN to najważniejsza i najtrudniejsza koncepcja w SQL. Pozwala łączyć dane z wielu tabel.
+
+**INNER JOIN - Tylko dopasowane rekordy**
+
+```sql
+SELECT 
+    a.name AS AccountName,
+    c.fullname AS ContactName,
+    c.emailaddress1 AS Email
+FROM 
+    accounts a
+INNER JOIN 
+    contacts c ON a.accountid = c.parentcustomerid
+WHERE 
+    a.statecode = 0
+```
+
+**Wizualizacja INNER JOIN:**
+
+```
+Accounts:                    Contacts:
+┌──────┬─────────┐          ┌──────┬──────────┬─────────────┐
+│  ID  │  Name   │          │  ID  │ FullName │ ParentAccID │
+├──────┼─────────┤          ├──────┼──────────┼─────────────┤
+│ A001 │ Contoso │ ────┐    │ C001 │ John Doe │ A001        │ ← Match!
+│ A002 │ Fabrikam│ ────┼───→│ C002 │ Jane S.  │ A001        │ ← Match!
+│ A003 │ AdWorks │     └───→│ C003 │ Bob M.   │ A002        │ ← Match!
+└──────┴─────────┘          │ C004 │ Alice K. │ A999        │ ← No match (orphan)
+                            └──────┴──────────┴─────────────┘
+
+Rezultat INNER JOIN (tylko matched):
+┌─────────┬──────────┐
+│ Contoso │ John Doe │
+│ Contoso │ Jane S.  │
+│ Fabrikam│ Bob M.   │
+└─────────┴──────────┘
+```
+
+**LEFT JOIN (LEFT OUTER JOIN) - Wszystkie z lewej, matched z prawej**
+
+```sql
+SELECT 
+    a.name AS AccountName,
+    c.fullname AS ContactName
+FROM 
+    accounts a
+LEFT JOIN 
+    contacts c ON a.accountid = c.parentcustomerid
+```
+
+**Wizualizacja LEFT JOIN:**
+
+```
+Accounts (LEFT):             Contacts (RIGHT):
+┌──────┬─────────┐          ┌──────┬──────────┬─────────────┐
+│ A001 │ Contoso │ ────┐    │ C001 │ John Doe │ A001        │
+│ A002 │ Fabrikam│ ────┼───→│ C002 │ Jane S.  │ A001        │
+│ A003 │ AdWorks │     └───→│ C003 │ Bob M.   │ A002        │
+│ A004 │ NoConts │  (brak matched contacts)
+└──────┴─────────┘          └──────┴──────────┴─────────────┘
+
+Rezultat LEFT JOIN (wszystkie accounts + matched contacts):
+┌─────────┬──────────┐
+│ Contoso │ John Doe │
+│ Contoso │ Jane S.  │
+│ Fabrikam│ Bob M.   │
+│ AdWorks │ NULL     │ ← Account bez contacts (NULL)
+│ NoConts │ NULL     │ ← Account bez contacts
+└─────────┴──────────┘
+```
+
+> 💡 **Kiedy używać INNER vs LEFT JOIN?**
+> - **INNER JOIN**: Chcesz TYLKO accounts które mają contacts
+> - **LEFT JOIN**: Chcesz WSZYSTKIE accounts, nawet te bez contacts
+
+#### Agregacje - GROUP BY
+
+Agregacje pozwalają na obliczenia na grupach danych.
+
+```sql
+SELECT 
+    accountcategorycode,           -- Kolumna do grupowania
+    COUNT(*) AS TotalAccounts,     -- Ile accounts w kategorii
+    SUM(revenue) AS TotalRevenue,  -- Suma revenue
+    AVG(revenue) AS AverageRevenue,-- Średnia revenue
+    MAX(revenue) AS HighestRevenue,-- Najwyższa revenue
+    MIN(revenue) AS LowestRevenue  -- Najniższa revenue
+FROM 
+    accounts
+WHERE 
+    statecode = 0                  -- Filtr PRZED grupowaniem
+GROUP BY 
+    accountcategorycode            -- Grupuj po kategorii
+HAVING 
+    COUNT(*) > 5                   -- Filtr PO grupowaniu
+ORDER BY 
+    TotalRevenue DESC
+```
+
+**Krok po kroku - co się dzieje:**
+
+```
+1. FROM accounts → Pobierz tabelę
+
+2. WHERE statecode = 0 → Filtruj (tylko active)
+┌──────┬─────────┬──────────┬──────────┐
+│  ID  │  Name   │ Category │ Revenue  │
+├──────┼─────────┼──────────┼──────────┤
+│ A001 │ Contoso │ 1        │ 1000000  │
+│ A002 │ Fabrikam│ 2        │ 500000   │
+│ A003 │ AdWorks │ 1        │ 750000   │
+│ A004 │ BlueYond│ 1        │ 600000   │
+│ A005 │ WingTip │ 2        │ 300000   │
+└──────┴─────────┴──────────┴──────────┘
+
+3. GROUP BY accountcategorycode → Grupuj
+Grupa 1 (Category = 1):
+  A001: 1000000
+  A003: 750000
+  A004: 600000
+
+Grupa 2 (Category = 2):
+  A002: 500000
+  A005: 300000
+
+4. Agregacje → Oblicz dla każdej grupy
+┌──────────┬──────────────┬──────────────┬────────────────┐
+│ Category │ TotalAccounts│ TotalRevenue │ AverageRevenue │
+├──────────┼──────────────┼──────────────┼────────────────┤
+│ 1        │ 3            │ 2,350,000    │ 783,333        │
+│ 2        │ 2            │ 800,000      │ 400,000        │
+└──────────┴──────────────┴──────────────┴────────────────┘
+
+5. HAVING COUNT(*) > 5 → Filtr grup (tutaj: żadna grupa nie ma > 5)
+
+6. ORDER BY TotalRevenue DESC → Sortuj
+```
+
+**WHERE vs HAVING - jaka różnica?**
+
+| Aspekt | WHERE | HAVING |
+|--------|-------|--------|
+| **Kiedy** | Przed GROUP BY | Po GROUP BY |
+| **Co filtruje** | Pojedyncze wiersze | Grupy |
+| **Może używać agregacji** | ❌ NIE | ✅ TAK |
+| **Przykład** | `WHERE revenue > 100000` | `HAVING COUNT(*) > 5` |
+
+```sql
+-- ✅ DOBRZE
+SELECT category, COUNT(*) 
+FROM accounts
+WHERE revenue > 100000      -- Filtr wierszy
+GROUP BY category
+HAVING COUNT(*) > 5         -- Filtr grup
+
+-- ❌ ŹLE - syntax error!
+SELECT category, COUNT(*) 
+FROM accounts
+WHERE COUNT(*) > 5          -- ERROR! Nie możesz użyć agregacji w WHERE
+GROUP BY category
+```
+
+#### Subqueries - zapytania zagnieżdżone
+
+Subquery to zapytanie wewnątrz zapytania. Używane do złożonych filtrów.
+
+**Przykład: Znajdź accounts z revenue wyższym niż średnia**
+
+```sql
+SELECT 
+    name,
+    revenue
+FROM 
+    accounts
+WHERE 
+    revenue > (
+        SELECT AVG(revenue)    -- Subquery - oblicz średnią
+        FROM accounts
+        WHERE statecode = 0
+    )
+    AND statecode = 0
+ORDER BY 
+    revenue DESC
+```
+
+**Krok po kroku:**
+
+```
+1. Wykonaj subquery (wewnętrzne zapytanie):
+   SELECT AVG(revenue) FROM accounts WHERE statecode = 0
+   Rezultat: 650000 (przykładowa średnia)
+
+2. Użyj wyniku w głównym zapytaniu:
+   SELECT name, revenue 
+   FROM accounts
+   WHERE revenue > 650000 AND statecode = 0
+```
+
+**Typy subqueries:**
+
+**A) Scalar subquery - zwraca pojedynczą wartość**
+```sql
+WHERE revenue > (SELECT AVG(revenue) FROM accounts)
+```
+
+**B) IN subquery - zwraca listę wartości**
+```sql
+WHERE accountid IN (
+    SELECT parentcustomerid 
+    FROM contacts 
+    WHERE emailaddress1 LIKE '%@contoso.com'
+)
+```
+
+**C) EXISTS subquery - sprawdza czy istnieją wiersze**
+```sql
+WHERE EXISTS (
+    SELECT 1 
+    FROM contacts 
+    WHERE contacts.parentcustomerid = accounts.accountid
+)
+```
+
+**EXISTS vs IN - performance:**
+
+```sql
+-- IN - może być wolniejsze dla dużych zbiorów
+WHERE accountid IN (SELECT ...)
+
+-- EXISTS - często szybsze (stop at first match)
+WHERE EXISTS (SELECT 1 WHERE ...)
+```
+
+> 💡 **TIP**: Używaj EXISTS gdy chcesz tylko sprawdzić "czy istnieje", nie potrzebujesz wartości.
+
+---
+
+## 3.2 FetchXML - język zapytań Dynamics 365
+
+### Czym jest FetchXML i dlaczego istnieje?
+
+FetchXML to **XML-based query language** stworzony specjalnie dla Microsoft Dynamics 365. Ale dlaczego Microsoft stworzył nowy język zapytań zamiast używać SQL?
+
+**Historyczny kontekst:**
+
+W 2007 roku Microsoft stanął przed dylematem:
+- **SQL** - potężny, ale:
+  - ❌ Wymaga bezpośredniego dostępu do bazy danych (security risk)
+  - ❌ Różne dialekty SQL (SQL Server vs Oracle vs DB2)
+  - ❌ Trudny do secure w multi-tenant environment
+  - ❌ Zbyt niski poziom (table names, column names exposed)
+
+- **Potrzeba:** Abstrakcja która:
+  - ✅ Działa identycznie on-premises i w cloud
+  - ✅ Ukrywa fizyczną strukturę bazy danych
+  - ✅ Jest secure by design
+  - ✅ Można łatwo serialize i transfer przez network
+  - ✅ Działa przez web services
+
+**Rozwiązanie: FetchXML**
+
+```xml
+<!-- FetchXML - declarative, portable, secure -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        <filter>
+            <condition attribute="revenue" operator="gt" value="1000000" />
+        </filter>
+    </entity>
+</fetch>
+```
+
+### Architektura FetchXML - jak to działa pod maską
+
+```mermaid
+graph LR
+    A[FetchXML Query] --> B[FetchXML Parser]
+    B --> C[Security Layer]
+    C --> D[Query Optimizer]
+    D --> E[SQL Generator]
+    E --> F[SQL Server]
+    F --> G[Results]
+    G --> H[Entity Serializer]
+    H --> I[返回 EntityCollection]
+    
+    style C fill:#FFB6C1
+    style E fill:#90EE90
+```
+
+**Krok po kroku:**
+
+1. **FetchXML Parser** - Parsuje XML, waliduje składnię
+2. **Security Layer** - Sprawdza permissions (CRITICAL!)
+3. **Query Optimizer** - Optymalizuje zapytanie
+4. **SQL Generator** - Konwertuje FetchXML → T-SQL
+5. **SQL Server** - Wykonuje zapytanie
+6. **Entity Serializer** - Konwertuje wyniki → EntityCollection
+
+> 📌 **WAŻNE**: FetchXML ZAWSZE przechodzi przez security layer. Nie możesz obejść permissions!
+
+### Podstawowa składnia FetchXML
+
+#### Element <fetch> - root element
+
+```xml
+<fetch 
+    version="1.0"           <!-- Wersja FetchXML (always 1.0) -->
+    output-format="xml-platform"  <!-- Format output -->
+    mapping="logical"       <!-- Logical names (nie physical) -->
+    distinct="false"        <!-- Distinct results? -->
+    count="50"              <!-- Ile rekordów (pagination) -->
+    page="1"                <!-- Która strona -->
+    aggregate="false">      <!-- Czy agregacja -->
+    
+    <!-- Entity definition goes here -->
+    
+</fetch>
+```
+
+**Atrybuty wyjaśnione:**
+
+- **count** - Limit wyników (max 5000 w single request!)
+- **page** - Numer strony (1-based)
+- **distinct** - Usuwa duplikaty (jak SQL DISTINCT)
+- **aggregate** - Tryb agregacji (COUNT, SUM, AVG, etc.)
+
+#### Element <entity> - tabela źródłowa
+
+```xml
+<fetch>
+    <entity name="account">  <!-- Logical name encji -->
+        <!-- Attributes, filters, links go here -->
+    </entity>
+</fetch>
+```
+
+> 💡 **TIP**: Używaj **logical names**, nie physical table names! 
+> - ✅ `<entity name="account">` 
+> - ❌ `<entity name="AccountBase">` (physical table)
+
+#### Element <attribute> - kolumny do pobrania
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="accountid" />   <!-- Primary key -->
+        <attribute name="name" />         <!-- Account name -->
+        <attribute name="revenue" />      <!-- Revenue -->
+        <attribute name="numberofemployees" />
+        
+        <!-- Lub wszystkie atrybuty (NOT RECOMMENDED dla dużych encji!) -->
+        <all-attributes />
+    </entity>
+</fetch>
+```
+
+**Best practice:**
+
+```xml
+<!-- ✅ DOBRZE - określ tylko potrzebne kolumny -->
+<entity name="account">
+    <attribute name="name" />
+    <attribute name="revenue" />
+</entity>
+
+<!-- ❌ ŹLE - pobiera WSZYSTKIE kolumny (slow!) -->
+<entity name="account">
+    <all-attributes />
+</entity>
+```
+
+> ⚠️ **PERFORMANCE**: Zawsze określaj tylko potrzebne atrybuty! `<all-attributes />` może zwrócić 100+ kolumn i drastycznie spowolnić query.
+
+
+#### Element <filter> - warunki WHERE
+
+Filter to odpowiednik klauzuli WHERE w SQL. Ale FetchXML oferuje więcej elastyczności.
+
+**Podstawowy filter:**
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <filter type="and">  <!-- Wszystkie warunki muszą być TRUE -->
+            <condition attribute="revenue" operator="gt" value="1000000" />
+            <condition attribute="statecode" operator="eq" value="0" />
+        </filter>
+    </entity>
+</fetch>
+```
+
+**Typy filtrów:**
+
+```xml
+<!-- AND - wszystkie warunki TRUE -->
+<filter type="and">
+    <condition attribute="revenue" operator="gt" value="1000000" />
+    <condition attribute="statecode" operator="eq" value="0" />
+</filter>
+<!-- SQL: WHERE revenue > 1000000 AND statecode = 0 -->
+
+<!-- OR - przynajmniej jeden warunek TRUE -->
+<filter type="or">
+    <condition attribute="accountcategorycode" operator="eq" value="1" />
+    <condition attribute="accountcategorycode" operator="eq" value="2" />
+</filter>
+<!-- SQL: WHERE accountcategorycode = 1 OR accountcategorycode = 2 -->
+```
+
+**Zagnieżdżone filtry - złożona logika:**
+
+```xml
+<!-- (revenue > 1M AND statecode = 0) OR (category = 1 AND employees > 100) -->
+<filter type="or">
+    <filter type="and">
+        <condition attribute="revenue" operator="gt" value="1000000" />
+        <condition attribute="statecode" operator="eq" value="0" />
+    </filter>
+    <filter type="and">
+        <condition attribute="accountcategorycode" operator="eq" value="1" />
+        <condition attribute="numberofemployees" operator="gt" value="100" />
+    </filter>
+</filter>
+```
+
+**Wizualizacja logiki:**
+
+```
+                OR
+               /  \
+             AND   AND
+            /  \   /  \
+         Rev>1M St=0 Cat=1 Emp>100
+         
+TRUE jeśli:
+  - (Revenue > 1M AND State = 0) = TRUE
+    LUB
+  - (Category = 1 AND Employees > 100) = TRUE
+```
+
+**Operatory FetchXML - kompletna lista:**
+
+| Operator | SQL Equivalent | Opis | Przykład |
+|----------|---------------|------|----------|
+| **eq** | = | Równe | `<condition attribute="statecode" operator="eq" value="0" />` |
+| **ne** | != lub <> | Nie równe | `<condition attribute="statecode" operator="ne" value="1" />` |
+| **gt** | > | Większe niż | `<condition attribute="revenue" operator="gt" value="1000000" />` |
+| **ge** | >= | Większe lub równe | `<condition attribute="revenue" operator="ge" value="1000000" />` |
+| **lt** | < | Mniejsze niż | `<condition attribute="numberofemployees" operator="lt" value="10" />` |
+| **le** | <= | Mniejsze lub równe | `<condition attribute="numberofemployees" operator="le" value="10" />` |
+| **like** | LIKE | Pattern matching | `<condition attribute="name" operator="like" value="%Contoso%" />` |
+| **not-like** | NOT LIKE | Negacja pattern | `<condition attribute="name" operator="not-like" value="%Test%" />` |
+| **in** | IN | W liście wartości | `<condition attribute="statecode" operator="in"><value>0</value><value>1</value></condition>` |
+| **not-in** | NOT IN | Nie w liście | `<condition attribute="statecode" operator="not-in"><value>2</value></condition>` |
+| **between** | BETWEEN | Między wartościami | `<condition attribute="revenue" operator="between"><value>100000</value><value>1000000</value></condition>` |
+| **not-between** | NOT BETWEEN | Nie między | `<condition attribute="revenue" operator="not-between"><value>0</value><value>10000</value></condition>` |
+| **null** | IS NULL | Jest null | `<condition attribute="telephone1" operator="null" />` |
+| **not-null** | IS NOT NULL | Nie jest null | `<condition attribute="emailaddress1" operator="not-null" />` |
+
+**Zaawansowane operatory (specyficzne dla Dynamics):**
+
+| Operator | Opis | Użycie |
+|----------|------|--------|
+| **today** | Dzisiaj | `<condition attribute="createdon" operator="today" />` |
+| **yesterday** | Wczoraj | `<condition attribute="createdon" operator="yesterday" />` |
+| **tomorrow** | Jutro | `<condition attribute="estimatedclosedate" operator="tomorrow" />` |
+| **this-week** | Ten tydzień | `<condition attribute="createdon" operator="this-week" />` |
+| **last-week** | Zeszły tydzień | `<condition attribute="createdon" operator="last-week" />` |
+| **this-month** | Ten miesiąc | `<condition attribute="createdon" operator="this-month" />` |
+| **last-x-days** | Ostatnie X dni | `<condition attribute="createdon" operator="last-x-days" value="30" />` |
+| **next-x-days** | Następne X dni | `<condition attribute="estimatedclosedate" operator="next-x-days" value="7" />` |
+| **on-or-after** | W dniu lub po | `<condition attribute="createdon" operator="on-or-after" value="2024-01-01" />` |
+| **on-or-before** | W dniu lub przed | `<condition attribute="createdon" operator="on-or-before" value="2024-12-31" />` |
+
+**Przykład: Znajdź accounts utworzone w ostatnim miesiącu z revenue > 1M**
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        <attribute name="createdon" />
+        <filter type="and">
+            <condition attribute="createdon" operator="this-month" />
+            <condition attribute="revenue" operator="gt" value="1000000" />
+            <condition attribute="statecode" operator="eq" value="0" />
+        </filter>
+        <order attribute="revenue" descending="true" />
+    </entity>
+</fetch>
+```
+
+#### Element <link-entity> - JOIN w FetchXML
+
+Link-entity to odpowiednik JOIN w SQL. Pozwala łączyć dane z powiązanych encji.
+
+**Podstawowy link (1:N relationship):**
+
+```xml
+<!-- Pobierz accounts z ich primary contacts -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        
+        <!-- Link do contact (lookup field: primarycontactid) -->
+        <link-entity 
+            name="contact"                    <!-- Encja do join -->
+            from="contactid"                  <!-- Klucz w contact -->
+            to="primarycontactid"             <!-- Klucz w account -->
+            link-type="inner"                 <!-- INNER JOIN -->
+            alias="primarycontact">           <!-- Alias dla wyników -->
+            
+            <attribute name="fullname" />
+            <attribute name="emailaddress1" />
+        </link-entity>
+    </entity>
+</fetch>
+```
+
+**Typy link-type (jak w SQL JOIN):**
+
+| Link Type | SQL Equivalent | Zachowanie |
+|-----------|---------------|------------|
+| **inner** | INNER JOIN | Tylko matched records z obu encji |
+| **outer** | LEFT OUTER JOIN | Wszystkie z głównej encji + matched z linked |
+| **exists** | EXISTS | Główna encja jeśli istnieje match (nie zwraca kolumn z linked) |
+| **in** | IN | Podobne do exists |
+
+**Przykład różnic:**
+
+```xml
+<!-- INNER JOIN - tylko accounts które MAJĄ primary contact -->
+<link-entity name="contact" from="contactid" to="primarycontactid" link-type="inner">
+</link-entity>
+
+<!-- LEFT OUTER JOIN - WSZYSTKIE accounts, nawet bez primary contact -->
+<link-entity name="contact" from="contactid" to="primarycontactid" link-type="outer">
+</link-entity>
+
+<!-- EXISTS - accounts które MAJĄ jakiekolwiek contacts (N:1 relationship) -->
+<link-entity name="contact" from="parentcustomerid" to="accountid" link-type="exists">
+</link-entity>
+```
+
+**Zagnieżdżone linki - multiple JOINs:**
+
+```xml
+<!-- Account → Primary Contact → Parent Account of Contact -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        
+        <!-- Link do Primary Contact -->
+        <link-entity name="contact" from="contactid" to="primarycontactid" alias="pc">
+            <attribute name="fullname" />
+            
+            <!-- Zagnieżdżony link - Parent Account of Contact -->
+            <link-entity name="account" from="accountid" to="parentcustomerid" alias="pca">
+                <attribute name="name" />
+            </link-entity>
+        </link-entity>
+    </entity>
+</fetch>
+```
+
+**Wizualizacja:**
+
+```
+Account (główna)
+    ↓ (primarycontactid)
+    Contact
+        ↓ (parentcustomerid)
+        Account (parent account of contact)
+```
+
+**Filtry na linked entities:**
+
+```xml
+<!-- Accounts z contacts które mają email @contoso.com -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        
+        <link-entity name="contact" from="parentcustomerid" to="accountid" alias="c">
+            <attribute name="fullname" />
+            
+            <!-- Filter na linked entity -->
+            <filter>
+                <condition attribute="emailaddress1" operator="like" value="%@contoso.com" />
+            </filter>
+        </link-entity>
+    </entity>
+</fetch>
+```
+
+#### Element <order> - sortowanie
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        
+        <!-- Sortowanie po revenue (malejąco) -->
+        <order attribute="revenue" descending="true" />
+        
+        <!-- Sortowanie po name (rosnąco) -->
+        <order attribute="name" descending="false" />
+    </entity>
+</fetch>
+```
+
+**Multiple order:**
+
+```xml
+<!-- Sortuj: najpierw po category (ASC), potem po revenue (DESC) -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="accountcategorycode" />
+        <attribute name="revenue" />
+        
+        <order attribute="accountcategorycode" descending="false" />
+        <order attribute="revenue" descending="true" />
+    </entity>
+</fetch>
+```
+
+#### Pagination - stronicowanie wyników
+
+FetchXML ma limit 5000 rekordów per request. Dla większych zbiorów używaj pagination.
+
+**Mechanizm pagination:**
+
+```xml
+<!-- Strona 1 - pierwsze 50 rekordów -->
+<fetch count="50" page="1">
+    <entity name="account">
+        <attribute name="name" />
+        <order attribute="name" />
+    </entity>
+</fetch>
+
+<!-- Strona 2 - następne 50 rekordów -->
+<fetch count="50" page="2">
+    <entity name="account">
+        <attribute name="name" />
+        <order attribute="name" />
+    </entity>
+</fetch>
+```
+
+**Paging cookie - wydajniejsza metoda:**
+
+```csharp
+// C# example - proper pagination
+string pagingCookie = null;
+int pageNumber = 1;
+bool moreRecords = true;
+
+while (moreRecords)
+{
+    string fetchXml = $@"
+    <fetch count='5000' page='{pageNumber}' paging-cookie='{SecurityElement.Escape(pagingCookie)}'>
+        <entity name='account'>
+            <attribute name='name' />
+            <order attribute='name' />
+        </entity>
+    </fetch>";
+
+    EntityCollection results = service.RetrieveMultiple(new FetchExpression(fetchXml));
+    
+    // Process results
+    foreach (Entity entity in results.Entities)
+    {
+        // Process entity
+    }
+
+    // Check if more records
+    moreRecords = results.MoreRecords;
+    
+    if (moreRecords)
+    {
+        pageNumber++;
+        pagingCookie = results.PagingCookie;
+    }
+}
+```
+
+**Dlaczego paging cookie jest lepsze niż page number?**
+
+```
+Bez paging cookie (page number):
+Page 1: Skip 0, Take 50    → Query time: 10ms
+Page 2: Skip 50, Take 50   → Query time: 15ms
+Page 3: Skip 100, Take 50  → Query time: 20ms
+Page 100: Skip 4950, Take 50 → Query time: 500ms+ (SLOW!)
+
+Z paging cookie:
+Page 1: Cookie: null        → Query time: 10ms
+Page 2: Cookie: "xyz123"    → Query time: 12ms
+Page 3: Cookie: "abc456"    → Query time: 11ms
+Page 100: Cookie: "def789"  → Query time: 13ms (FAST!)
+```
+
+> 💡 **Performance tip**: Zawsze używaj paging cookie dla dużych zbiorów danych!
+
+---
+
+## 3.3 FetchXML - zaawansowane techniki
+
+### Agregacje w FetchXML
+
+Agregacje pozwalają na obliczenia grupowe (jak GROUP BY w SQL).
+
+**Podstawowa agregacja:**
+
+```xml
+<!-- Policz ile accounts w każdej kategorii -->
+<fetch aggregate="true">
+    <entity name="account">
+        <attribute name="accountcategorycode" groupby="true" alias="category" />
+        <attribute name="accountid" aggregate="count" alias="total_count" />
+    </entity>
+</fetch>
+```
+
+**Typy agregacji:**
+
+| Funkcja | Opis | SQL Equivalent |
+|---------|------|----------------|
+| **count** | Liczba rekordów | COUNT(*) |
+| **countcolumn** | Liczba non-null values | COUNT(column) |
+| **sum** | Suma wartości | SUM(column) |
+| **avg** | Średnia | AVG(column) |
+| **min** | Minimum | MIN(column) |
+| **max** | Maximum | MAX(column) |
+
+**Przykłady agregacji:**
+
+```xml
+<!-- Przykład 1: Suma revenue per category -->
+<fetch aggregate="true">
+    <entity name="account">
+        <attribute name="accountcategorycode" groupby="true" alias="category" />
+        <attribute name="revenue" aggregate="sum" alias="total_revenue" />
+        <attribute name="revenue" aggregate="avg" alias="avg_revenue" />
+        <attribute name="accountid" aggregate="count" alias="account_count" />
+    </entity>
+</fetch>
+
+<!-- Rezultat:
+┌──────────┬───────────────┬─────────────┬───────────────┐
+│ category │ total_revenue │ avg_revenue │ account_count │
+├──────────┼───────────────┼─────────────┼───────────────┤
+│ 1        │ 5,000,000     │ 1,000,000   │ 5             │
+│ 2        │ 2,000,000     │ 500,000     │ 4             │
+└──────────┴───────────────┴─────────────┴───────────────┘
+-->
+
+<!-- Przykład 2: Group by z filtrem -->
+<fetch aggregate="true">
+    <entity name="account">
+        <attribute name="accountcategorycode" groupby="true" alias="category" />
+        <attribute name="revenue" aggregate="sum" alias="total_revenue" />
+        
+        <!-- Filter przed grupowaniem -->
+        <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="createdon" operator="this-year" />
+        </filter>
+    </entity>
+</fetch>
+
+<!-- Przykład 3: Group by z date grouping -->
+<fetch aggregate="true">
+    <entity name="account">
+        <!-- Grupuj po roku utworzenia -->
+        <attribute name="createdon" groupby="true" dategrouping="year" alias="created_year" />
+        <attribute name="accountid" aggregate="count" alias="accounts_created" />
+        <attribute name="revenue" aggregate="sum" alias="total_revenue" />
+        
+        <order alias="created_year" descending="true" />
+    </entity>
+</fetch>
+```
+
+**Date grouping options:**
+
+- `day` - Dzień
+- `week` - Tydzień
+- `month` - Miesiąc
+- `quarter` - Kwartał
+- `year` - Rok
+
+**Multiple group by:**
+
+```xml
+<!-- Grupuj po category I owner -->
+<fetch aggregate="true">
+    <entity name="account">
+        <attribute name="accountcategorycode" groupby="true" alias="category" />
+        <attribute name="ownerid" groupby="true" alias="owner" />
+        <attribute name="accountid" aggregate="count" alias="total" />
+        <attribute name="revenue" aggregate="sum" alias="revenue" />
+    </entity>
+</fetch>
+```
+
+### Distinct values
+
+```xml
+<!-- Unikalne wartości industry code -->
+<fetch distinct="true">
+    <entity name="account">
+        <attribute name="industrycode" />
+        <order attribute="industrycode" />
+    </entity>
+</fetch>
+```
+
+### Top N records
+
+```xml
+<!-- Top 10 accounts po revenue -->
+<fetch top="10">
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        
+        <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+        </filter>
+        
+        <order attribute="revenue" descending="true" />
+    </entity>
+</fetch>
+```
+
+### FetchXML z lookup values
+
+**Problem:** Jak filtrować po lookup field (EntityReference)?
+
+```xml
+<!-- Znajdź accounts należące do konkretnego owner -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        
+        <filter>
+            <!-- Filtr po GUID ownera -->
+            <condition 
+                attribute="ownerid" 
+                operator="eq" 
+                value="{12345678-1234-1234-1234-123456789012}" />
+        </filter>
+    </entity>
+</fetch>
+
+<!-- Lub z uicname (nazwa lookupa) -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        
+        <filter>
+            <condition 
+                attribute="ownerid" 
+                operator="eq" 
+                value="{12345678-1234-1234-1234-123456789012}" 
+                uiname="John Doe" 
+                uitype="systemuser" />
+        </filter>
+    </entity>
+</fetch>
+```
+
+### FetchXML z OptionSet values
+
+```xml
+<!-- Filtr po OptionSet (category) -->
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="accountcategorycode" />
+        
+        <filter>
+            <!-- Single value -->
+            <condition attribute="accountcategorycode" operator="eq" value="1" />
+            
+            <!-- Multiple values (IN) -->
+            <condition attribute="accountcategorycode" operator="in">
+                <value>1</value>
+                <value>2</value>
+            </condition>
+        </filter>
+    </entity>
+</fetch>
+```
+
+### Przykłady Real-World
+
+**Przykład 1: Customer 360 View**
+
+Pobierz kompletne informacje o kliencie: account + contacts + opportunities
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        <attribute name="numberofemployees" />
+        
+        <!-- All contacts for this account -->
+        <link-entity name="contact" from="parentcustomerid" to="accountid" link-type="outer" alias="contacts">
+            <attribute name="fullname" />
+            <attribute name="emailaddress1" />
+            <attribute name="telephone1" />
+        </link-entity>
+        
+        <!-- All opportunities for this account -->
+        <link-entity name="opportunity" from="customerid" to="accountid" link-type="outer" alias="opportunities">
+            <attribute name="name" />
+            <attribute name="estimatedvalue" />
+            <attribute name="closeprobability" />
+            <attribute name="estimatedclosedate" />
+            
+            <filter>
+                <condition attribute="statecode" operator="eq" value="0" />
+            </filter>
+        </link-entity>
+        
+        <filter>
+            <condition attribute="accountid" operator="eq" value="{ACCOUNT-GUID}" />
+        </filter>
+    </entity>
+</fetch>
+```
+
+**Przykład 2: Sales Pipeline Analysis**
+
+Analiza pipeline sprzedażowego - suma opportunities po sales stage
+
+```xml
+<fetch aggregate="true">
+    <entity name="opportunity">
+        <attribute name="salesstagecode" groupby="true" alias="stage" />
+        <attribute name="estimatedvalue" aggregate="sum" alias="total_value" />
+        <attribute name="estimatedvalue" aggregate="avg" alias="avg_value" />
+        <attribute name="opportunityid" aggregate="count" alias="count" />
+        
+        <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="estimatedclosedate" operator="next-x-days" value="90" />
+        </filter>
+        
+        <order alias="stage" />
+    </entity>
+</fetch>
+```
+
+**Przykład 3: Inactive Customers Report**
+
+Znajdź accounts bez aktywności (no opportunities) w ostatnich 6 miesiącach
+
+```xml
+<fetch>
+    <entity name="account">
+        <attribute name="name" />
+        <attribute name="revenue" />
+        <attribute name="primarycontactid" />
+        
+        <!-- Link to opportunities -->
+        <link-entity name="opportunity" from="customerid" to="accountid" link-type="outer" alias="opp">
+            <filter type="and">
+                <condition attribute="createdon" operator="last-x-months" value="6" />
+            </filter>
+        </link-entity>
+        
+        <!-- Account filters -->
+        <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+            
+            <!-- No opportunities created in last 6 months -->
+            <condition entityname="opp" attribute="opportunityid" operator="null" />
+        </filter>
+        
+        <order attribute="revenue" descending="true" />
+    </entity>
+</fetch>
+```
+
+
+---
+
+## 3.4 QueryExpression - programmatic query API
+
+### Czym jest QueryExpression i kiedy go używać?
+
+QueryExpression to **strongly-typed, object-oriented API** do budowania zapytań w C#. Jest to trzecia (i ostatnia) metoda query w Dynamics 365.
+
+**Dlaczego QueryExpression istnieje obok FetchXML?**
+
+Wyobraź sobie że jesteś C# developerem piszącym plugin. Możesz:
+
+**Opcja 1: FetchXML (string manipulation)**
+```csharp
+string fetchXml = $@"
+<fetch>
+    <entity name='account'>
+        <filter>
+            <condition attribute='revenue' operator='gt' value='{minRevenue}' />
+        </filter>
+    </entity>
+</fetch>";
+```
+
+❌ **Problemy:**
+- String concatenation (error-prone)
+- Brak IntelliSense
+- Brak compile-time checking
+- SQL injection risk (jeśli źle escaped)
+
+**Opcja 2: QueryExpression (object-oriented)**
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    Criteria = new FilterExpression
+    {
+        Conditions =
+        {
+            new ConditionExpression("revenue", ConditionOperator.GreaterThan, minRevenue)
+        }
+    }
+};
+```
+
+✅ **Korzyści:**
+- Type-safe (compile-time errors)
+- IntelliSense support
+- Refactoring-friendly
+- No string manipulation
+
+> 💡 **KIEDY UŻYWAĆ:**
+> - **QueryExpression**: C# plugins, server-side code, type safety wymagana
+> - **FetchXML**: Reporting, charts, advanced features (aggregate), cross-language
+> - **SQL**: Read-only analytics (on-premises only)
+
+### Podstawowa składnia QueryExpression
+
+#### Tworzenie query
+
+```csharp
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+
+// Podstawowe query - wszystkie kolumny
+var query = new QueryExpression("account");
+
+// Query z wybranymi kolumnami
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("accountid", "name", "revenue")
+};
+
+// Lub wszystkie kolumny (NOT RECOMMENDED!)
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet(true) // allColumns = true
+};
+```
+
+**Analiza składni:**
+
+```csharp
+var query = new QueryExpression(
+    "account"              // Entity logical name
+);
+
+query.ColumnSet = new ColumnSet(
+    "name",                // Column 1
+    "revenue",             // Column 2
+    "numberofemployees"    // Column 3
+);
+```
+
+**Object initializer syntax (recommended):**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    TopCount = 10
+};
+```
+
+### ColumnSet - wybieranie kolumn
+
+```csharp
+// Metoda 1: Konstruktor z parametrami
+var columnSet = new ColumnSet("name", "revenue", "numberofemployees");
+
+// Metoda 2: AddColumn
+var columnSet = new ColumnSet();
+columnSet.AddColumn("name");
+columnSet.AddColumn("revenue");
+
+// Metoda 3: AddColumns (multiple)
+var columnSet = new ColumnSet();
+columnSet.AddColumns("name", "revenue", "numberofemployees");
+
+// Metoda 4: AllColumns (unikaj!)
+var columnSet = new ColumnSet(true);
+
+// Użycie w query
+var query = new QueryExpression("account")
+{
+    ColumnSet = columnSet
+};
+```
+
+**Best practice:**
+
+```csharp
+// ✅ DOBRZE - explicit columns
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue")
+};
+
+// ❌ ŹLE - all columns
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet(true)
+};
+
+// ✅ DOBRZE - no columns (count only)
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet(false)
+};
+```
+
+### FilterExpression - filtrowanie danych
+
+FilterExpression to odpowiednik <filter> w FetchXML i WHERE w SQL.
+
+**Podstawowy filter:**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    Criteria = new FilterExpression
+    {
+        FilterOperator = LogicalOperator.And,
+        Conditions =
+        {
+            new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000),
+            new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+        }
+    }
+};
+```
+
+**Anatomia FilterExpression:**
+
+```
+FilterExpression
+│
+├─ FilterOperator: And/Or
+│
+├─ Conditions: List<ConditionExpression>
+│  ├─ ConditionExpression 1
+│  ├─ ConditionExpression 2
+│  └─ ConditionExpression 3
+│
+└─ Filters: List<FilterExpression> (nested)
+   ├─ FilterExpression (child)
+   └─ FilterExpression (child)
+```
+
+**LogicalOperator:**
+
+```csharp
+// AND - wszystkie warunki muszą być TRUE
+FilterOperator = LogicalOperator.And
+
+// OR - przynajmniej jeden warunek TRUE
+FilterOperator = LogicalOperator.Or
+```
+
+### ConditionExpression - pojedyncze warunki
+
+```csharp
+// Konstruktor: (attribute, operator, value)
+new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000)
+
+// Lub bez value (dla null checks)
+new ConditionExpression("telephone1", ConditionOperator.Null)
+
+// Multiple values (IN operator)
+new ConditionExpression("statecode", ConditionOperator.In, new object[] { 0, 1 })
+
+// Between
+new ConditionExpression("revenue", ConditionOperator.Between, new object[] { 100000, 1000000 })
+```
+
+**ConditionOperator - kompletna lista:**
+
+| ConditionOperator | SQL | Opis |
+|-------------------|-----|------|
+| **Equal** | = | Równe |
+| **NotEqual** | != | Nie równe |
+| **GreaterThan** | > | Większe |
+| **GreaterEqual** | >= | Większe lub równe |
+| **LessThan** | < | Mniejsze |
+| **LessEqual** | <= | Mniejsze lub równe |
+| **Like** | LIKE | Pattern matching |
+| **NotLike** | NOT LIKE | Negacja pattern |
+| **In** | IN | W liście wartości |
+| **NotIn** | NOT IN | Nie w liście |
+| **Between** | BETWEEN | Między wartościami |
+| **NotBetween** | NOT BETWEEN | Nie między |
+| **Null** | IS NULL | Jest null |
+| **NotNull** | IS NOT NULL | Nie jest null |
+| **Today** | - | Dzisiaj |
+| **Yesterday** | - | Wczoraj |
+| **Tomorrow** | - | Jutro |
+| **ThisWeek** | - | Ten tydzień |
+| **LastWeek** | - | Zeszły tydzień |
+| **ThisMonth** | - | Ten miesiąc |
+| **LastXDays** | - | Ostatnie X dni |
+| **NextXDays** | - | Następne X dni |
+
+**Przykłady użycia:**
+
+```csharp
+// Equal
+new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+
+// GreaterThan
+new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000)
+
+// Like (pattern matching)
+new ConditionExpression("name", ConditionOperator.Like, "%Contoso%")
+
+// In (multiple values)
+new ConditionExpression("accountcategorycode", ConditionOperator.In, 
+    new object[] { 1, 2, 3 })
+
+// Between
+new ConditionExpression("numberofemployees", ConditionOperator.Between, 
+    new object[] { 10, 100 })
+
+// Null check
+new ConditionExpression("telephone1", ConditionOperator.Null)
+
+// Date operators
+new ConditionExpression("createdon", ConditionOperator.ThisMonth)
+new ConditionExpression("createdon", ConditionOperator.LastXDays, 30)
+```
+
+### Nested filters - złożona logika
+
+Zagnieżdżone filtry pozwalają tworzyć złożone warunki logiczne.
+
+**Przykład: (revenue > 1M AND statecode = 0) OR (category = 1 AND employees > 100)**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    Criteria = new FilterExpression
+    {
+        FilterOperator = LogicalOperator.Or,
+        Filters =
+        {
+            // First group: revenue > 1M AND statecode = 0
+            new FilterExpression
+            {
+                FilterOperator = LogicalOperator.And,
+                Conditions =
+                {
+                    new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000),
+                    new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+                }
+            },
+            
+            // Second group: category = 1 AND employees > 100
+            new FilterExpression
+            {
+                FilterOperator = LogicalOperator.And,
+                Conditions =
+                {
+                    new ConditionExpression("accountcategorycode", ConditionOperator.Equal, 1),
+                    new ConditionExpression("numberofemployees", ConditionOperator.GreaterThan, 100)
+                }
+            }
+        }
+    }
+};
+```
+
+**Wizualizacja struktury:**
+
+```
+FilterExpression (OR)
+├── FilterExpression (AND)
+│   ├── revenue > 1M
+│   └── statecode = 0
+└── FilterExpression (AND)
+    ├── category = 1
+    └── employees > 100
+```
+
+**Helper method dla czytelności:**
+
+```csharp
+public class QueryHelper
+{
+    public static FilterExpression CreateAndFilter(params ConditionExpression[] conditions)
+    {
+        var filter = new FilterExpression(LogicalOperator.And);
+        foreach (var condition in conditions)
+        {
+            filter.AddCondition(condition);
+        }
+        return filter;
+    }
+    
+    public static FilterExpression CreateOrFilter(params ConditionExpression[] conditions)
+    {
+        var filter = new FilterExpression(LogicalOperator.Or);
+        foreach (var condition in conditions)
+        {
+            filter.AddCondition(condition);
+        }
+        return filter;
+    }
+}
+
+// Użycie:
+var query = new QueryExpression("account")
+{
+    Criteria = QueryHelper.CreateOrFilter(
+        QueryHelper.CreateAndFilter(
+            new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000),
+            new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+        ),
+        QueryHelper.CreateAndFilter(
+            new ConditionExpression("accountcategorycode", ConditionOperator.Equal, 1),
+            new ConditionExpression("numberofemployees", ConditionOperator.GreaterThan, 100)
+        )
+    )
+};
+```
+
+### LinkEntity - JOIN w QueryExpression
+
+LinkEntity to odpowiednik JOIN w SQL i <link-entity> w FetchXML.
+
+**Podstawowy link:**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue")
+};
+
+// Link to contact (primary contact)
+var contactLink = query.AddLink(
+    "contact",              // Linked entity name
+    "primarycontactid",     // Attribute in account (from)
+    "contactid",            // Attribute in contact (to)
+    JoinOperator.Inner      // Join type
+);
+
+contactLink.Columns = new ColumnSet("fullname", "emailaddress1");
+contactLink.EntityAlias = "primarycontact";
+```
+
+**JoinOperator types:**
+
+```csharp
+// INNER JOIN - tylko matched
+JoinOperator.Inner
+
+// LEFT OUTER JOIN - wszystkie z głównej + matched
+JoinOperator.LeftOuter
+
+// NATURAL - automatycznie wykrywa relationship
+JoinOperator.Natural
+```
+
+**Przykład z filtrem na linked entity:**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue")
+};
+
+var contactLink = query.AddLink(
+    "contact",
+    "accountid",
+    "parentcustomerid",
+    JoinOperator.Inner
+);
+
+contactLink.Columns = new ColumnSet("fullname", "emailaddress1");
+contactLink.EntityAlias = "contact";
+
+// Filter na linked entity
+contactLink.LinkCriteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("emailaddress1", ConditionOperator.Like, "%@contoso.com")
+    }
+};
+```
+
+**Zagnieżdżone links:**
+
+```csharp
+// Account → Contact → Parent Account
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name")
+};
+
+// First link: Account → Contact
+var contactLink = query.AddLink(
+    "contact",
+    "primarycontactid",
+    "contactid",
+    JoinOperator.LeftOuter
+);
+contactLink.Columns = new ColumnSet("fullname");
+contactLink.EntityAlias = "primarycontact";
+
+// Second link (nested): Contact → Parent Account
+var parentAccountLink = contactLink.AddLink(
+    "account",
+    "parentcustomerid",
+    "accountid",
+    JoinOperator.LeftOuter
+);
+parentAccountLink.Columns = new ColumnSet("name");
+parentAccountLink.EntityAlias = "parentaccount";
+```
+
+### OrderExpression - sortowanie
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    Orders =
+    {
+        // Sort by revenue DESC
+        new OrderExpression("revenue", OrderType.Descending),
+        
+        // Then by name ASC
+        new OrderExpression("name", OrderType.Ascending)
+    }
+};
+```
+
+**OrderType:**
+- `OrderType.Ascending` - Rosnąco (A→Z, 0→9)
+- `OrderType.Descending` - Malejąco (Z→A, 9→0)
+
+### PageInfo - stronicowanie
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name"),
+    PageInfo = new PagingInfo
+    {
+        PageNumber = 1,       // Strona (1-based)
+        Count = 50,           // Ile rekordów per strona
+        ReturnTotalRecordCount = true  // Zwróć total count
+    }
+};
+
+EntityCollection results = service.RetrieveMultiple(query);
+
+Console.WriteLine($"Total records: {results.TotalRecordCount}");
+Console.WriteLine($"More records: {results.MoreRecords}");
+```
+
+**Pełny przykład pagination:**
+
+```csharp
+public List<Entity> GetAllAccountsPaged(IOrganizationService service)
+{
+    var allAccounts = new List<Entity>();
+    int pageNumber = 1;
+    bool moreRecords = true;
+
+    while (moreRecords)
+    {
+        var query = new QueryExpression("account")
+        {
+            ColumnSet = new ColumnSet("name", "revenue"),
+            PageInfo = new PagingInfo
+            {
+                PageNumber = pageNumber,
+                Count = 5000,
+                PagingCookie = null
+            }
+        };
+
+        EntityCollection results = service.RetrieveMultiple(query);
+        
+        allAccounts.AddRange(results.Entities);
+        
+        moreRecords = results.MoreRecords;
+        
+        if (moreRecords)
+        {
+            pageNumber++;
+            query.PageInfo.PagingCookie = results.PagingCookie;
+        }
+    }
+
+    return allAccounts;
+}
+```
+
+### TopCount - limit wyników
+
+```csharp
+// Top 10 accounts
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    TopCount = 10,
+    Orders =
+    {
+        new OrderExpression("revenue", OrderType.Descending)
+    }
+};
+```
+
+### Distinct - unikalne wartości
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("industrycode"),
+    Distinct = true
+};
+```
+
+### NoLock - read without locking
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name"),
+    NoLock = true  // Prevents row locking (performance boost)
+};
+```
+
+> ⚠️ **UWAGA**: NoLock może zwrócić uncommitted data. Używaj tylko gdy akceptujesz dirty reads.
+
+### Przykłady praktyczne
+
+**Przykład 1: Top 10 high-revenue accounts z primary contact**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue", "numberofemployees"),
+    TopCount = 10
+};
+
+// Add primary contact link
+var contactLink = query.AddLink(
+    "contact",
+    "primarycontactid",
+    "contactid",
+    JoinOperator.LeftOuter
+);
+contactLink.Columns = new ColumnSet("fullname", "emailaddress1", "telephone1");
+contactLink.EntityAlias = "primarycontact";
+
+// Filters
+query.Criteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+        new ConditionExpression("revenue", ConditionOperator.NotNull)
+    }
+};
+
+// Sort by revenue
+query.Orders.Add(new OrderExpression("revenue", OrderType.Descending));
+
+// Execute
+EntityCollection results = service.RetrieveMultiple(query);
+
+foreach (Entity account in results.Entities)
+{
+    string accountName = account.GetAttributeValue<string>("name");
+    Money revenue = account.GetAttributeValue<Money>("revenue");
+    
+    // Get linked contact data
+    AliasedValue contactName = account.GetAttributeValue<AliasedValue>("primarycontact.fullname");
+    
+    if (contactName != null)
+    {
+        Console.WriteLine($"{accountName}: ${revenue?.Value:N0} - Contact: {contactName.Value}");
+    }
+}
+```
+
+**Przykład 2: Accounts created this month z opportunity count**
+
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "createdon", "revenue")
+};
+
+// Link to opportunities (count)
+var oppLink = query.AddLink(
+    "opportunity",
+    "accountid",
+    "customerid",
+    JoinOperator.LeftOuter
+);
+oppLink.EntityAlias = "opp";
+oppLink.Columns = new ColumnSet(); // No columns needed
+
+// Filter
+query.Criteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("createdon", ConditionOperator.ThisMonth),
+        new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+    }
+};
+
+// Order
+query.Orders.Add(new OrderExpression("createdon", OrderType.Descending));
+
+EntityCollection results = service.RetrieveMultiple(query);
+```
+
+**Przykład 3: Complex filter - accounts bez aktywności**
+
+```csharp
+// Find accounts without opportunities in last 6 months
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue", "createdon")
+};
+
+var oppLink = query.AddLink(
+    "opportunity",
+    "accountid",
+    "customerid",
+    JoinOperator.LeftOuter
+);
+oppLink.EntityAlias = "opp";
+
+// Filter on opportunities
+oppLink.LinkCriteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("createdon", ConditionOperator.LastXMonths, 6)
+    }
+};
+
+// Main filter - no opportunities
+query.Criteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+        new ConditionExpression("opp", "opportunityid", ConditionOperator.Null)
+    }
+};
+
+EntityCollection results = service.RetrieveMultiple(query);
+```
+
+
+---
+
+## 3.5 Optymalizacja zapytań - Performance tuning
+
+### Dlaczego optymalizacja jest krytyczna?
+
+W Dynamics 365 nieoptymalne zapytania to **najczęstsza przyczyna** problemów z wydajnością. Różnica między dobrym a złym zapytaniem może być dramatyczna:
+
+```
+❌ Źle zoptymalizowane query: 30,000ms (30 sekund!)
+✅ Zoptymalizowane query:        150ms (0.15 sekundy)
+
+200x SZYBSZE!
+```
+
+### Indeksy w Dataverse - jak działają
+
+**Analogia do książki:**
+
+Wyobraź sobie książkę telefoniczną z 1,000,000 wpisów:
+
+**Bez indeksu** (linear search):
+- Szukasz "John Smith"
+- Musisz przejrzeć każdą stronę od początku
+- Worst case: 1,000,000 porównań
+
+**Z indeksem** (binary search):
+- Książka posortowana alfabetycznie
+- Otwierasz na środku → porównujesz → połowa odrzucona
+- Powtarzasz aż znajdziesz
+- Worst case: log₂(1,000,000) ≈ 20 porównań
+
+**50,000x SZYBSZE!**
+
+### Domyślne indeksy w Dataverse
+
+Dataverse automatycznie tworzy indeksy na:
+
+✅ **Primary Key** (accountid, contactid, etc.)  
+✅ **Lookup fields** (parentcustomerid, ownerid, etc.)  
+✅ **Alternate Keys** (jeśli zdefiniowane)  
+✅ **State/Status** (statecode, statuscode)  
+
+❌ **Brak indeksów na:**
+- Custom string fields
+- Custom numeric fields  
+- OptionSet fields (poza standard)
+
+### Przykład: indexed vs non-indexed query
+
+```sql
+-- ✅ SZYBKO - query na indexed field (accountid)
+SELECT name FROM account WHERE accountid = '123-456-789'
+-- Execution time: ~5ms
+
+-- ❌ WOLNO - query na non-indexed field (custom field)
+SELECT name FROM account WHERE cr9e5_customfield = 'value'
+-- Execution time: ~5,000ms (1000x wolniej!)
+```
+
+**Dlaczego?**
+
+```
+Indexed field (accountid):
+1. Database sprawdza index → natychmiastowo znajduje wiersz
+2. Reads: 1 row
+
+Non-indexed field (cr9e5_customfield):
+1. Database skanuje CAŁĄ tabelę linia po linii
+2. Reads: 1,000,000 rows (jeśli tyle jest rekordów)
+```
+
+### Best practices - optymalizacja zapytań
+
+#### 1. Wybieraj tylko potrzebne kolumny
+
+```csharp
+// ❌ ŹLE - pobiera wszystkie kolumny (100+ fields!)
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet(true)
+};
+// Network transfer: ~500KB per record!
+
+// ✅ DOBRZE - tylko potrzebne kolumny
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("accountid", "name", "revenue")
+};
+// Network transfer: ~5KB per record (100x mniej!)
+```
+
+**Dlaczego to ma znaczenie?**
+
+```
+1000 rekordów × 500KB = 500MB transfer!
+1000 rekordów × 5KB = 5MB transfer
+
+Różnica: 495MB zaoszczędzone
+Czas: 50 sekund vs 0.5 sekundy (na wolnym łączu)
+```
+
+#### 2. Używaj paginacji
+
+```csharp
+// ❌ ŹLE - pobiera 100,000 rekordów naraz
+var query = new QueryExpression("account");
+EntityCollection results = service.RetrieveMultiple(query);
+// Memory: ~500MB
+// Time: ~60 seconds
+
+// ✅ DOBRZE - pagination (5000 per page)
+var query = new QueryExpression("account")
+{
+    PageInfo = new PagingInfo
+    {
+        Count = 5000,
+        PageNumber = 1
+    }
+};
+// Memory: ~25MB per page
+// Time: ~3 seconds per page
+```
+
+#### 3. Filtruj wcześnie (push down)
+
+```csharp
+// ❌ ŹLE - pobiera wszystko, filtruje w memory
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue", "statecode")
+};
+var results = service.RetrieveMultiple(query);
+
+// Filter in memory
+var activeAccounts = results.Entities
+    .Where(a => a.GetAttributeValue<OptionSetValue>("statecode")?.Value == 0)
+    .ToList();
+// Pobranych: 100,000 records
+// Używanych: 50,000 records (50% marnuje!)
+
+// ✅ DOBRZE - filtruj w database
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    Criteria = new FilterExpression
+    {
+        Conditions =
+        {
+            new ConditionExpression("statecode", ConditionOperator.Equal, 0)
+        }
+    }
+};
+var results = service.RetrieveMultiple(query);
+// Pobranych: 50,000 records (tylko active)
+```
+
+**Dlaczego?**
+
+```
+Filter in memory:
+1. Database → 100,000 rows
+2. Network → transfer all 100,000
+3. Memory → load all 100,000
+4. CPU → filter to 50,000
+Total: 100,000 rows processed
+
+Filter in database:
+1. Database → filter to 50,000
+2. Network → transfer 50,000
+3. Memory → load 50,000
+Total: 50,000 rows processed
+
+50% MNIEJ pracy!
+```
+
+#### 4. Unikaj N+1 queries
+
+**N+1 problem** to klasyczny anti-pattern:
+
+```csharp
+// ❌ ŹLE - N+1 queries
+// Query 1: Get all accounts
+var accounts = service.RetrieveMultiple(new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("accountid", "name")
+}).Entities;
+
+// Queries 2-1001: Get contact for each account (1000 accounts = 1000 queries!)
+foreach (var account in accounts)
+{
+    var contactQuery = new QueryExpression("contact")
+    {
+        ColumnSet = new ColumnSet("fullname"),
+        Criteria = new FilterExpression
+        {
+            Conditions =
+            {
+                new ConditionExpression("parentcustomerid", ConditionOperator.Equal, account.Id)
+            }
+        }
+    };
+    
+    var contacts = service.RetrieveMultiple(contactQuery);
+    // Process contacts...
+}
+// Total queries: 1 + 1000 = 1001
+// Time: ~100ms × 1001 = 100 seconds!
+```
+
+```csharp
+// ✅ DOBRZE - Single query with JOIN
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("accountid", "name")
+};
+
+var contactLink = query.AddLink(
+    "contact",
+    "accountid",
+    "parentcustomerid",
+    JoinOperator.LeftOuter
+);
+contactLink.Columns = new ColumnSet("fullname");
+contactLink.EntityAlias = "contact";
+
+var results = service.RetrieveMultiple(query);
+// Total queries: 1
+// Time: ~500ms (200x SZYBSZE!)
+```
+
+#### 5. Używaj NoLock dla read-only queries
+
+```csharp
+// ✅ DOBRZE - NoLock dla reporting
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("name", "revenue"),
+    NoLock = true  // Nie blokuj tabel
+};
+```
+
+**Kiedy używać NoLock:**
+- ✅ Read-only reporting
+- ✅ Dashboards
+- ✅ Analytics
+- ❌ Transactional data (risk of dirty reads)
+
+#### 6. Optymalizuj JOIN order
+
+```csharp
+// ❌ ŹLE - JOIN dużej tabeli z małą
+// Orders (1,000,000 rows) JOIN Products (100 rows)
+// Database musi process 1,000,000 rows
+
+// ✅ DOBRZE - JOIN małej z dużą (gdy możliwe)
+// Products (100 rows) JOIN Orders (filtered to 1,000)
+// Database process tylko 1,000 rows
+```
+
+> 💡 **TIP**: Dataverse query optimizer robi to automatycznie, ale warto o tym wiedzieć.
+
+### Monitoring i diagnostyka
+
+#### 1. Plugin Trace Logs
+
+```csharp
+public void Execute(IServiceProvider serviceProvider)
+{
+    var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+    
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    
+    var query = new QueryExpression("account")
+    {
+        ColumnSet = new ColumnSet("name")
+    };
+    
+    var results = service.RetrieveMultiple(query);
+    
+    stopwatch.Stop();
+    tracing.Trace($"Query time: {stopwatch.ElapsedMilliseconds}ms");
+    tracing.Trace($"Records retrieved: {results.Entities.Count}");
+}
+```
+
+#### 2. FetchXML performance analysis
+
+```xml
+<!-- Użyj DISTINCT tylko gdy potrzebne -->
+<fetch distinct="false">  <!-- ✅ Szybsze -->
+<fetch distinct="true">   <!-- ❌ Wolniejsze (dodatkowa operacja) -->
+
+<!-- Sortowanie jest kosztowne -->
+<order attribute="name" />  <!-- Dodaje overhead -->
+```
+
+### Performance checklist
+
+Przed deploymentem query, sprawdź:
+
+- [ ] **Tylko potrzebne kolumny** (nie `<all-attributes />` ani `ColumnSet(true)`)
+- [ ] **Filter w database** (nie in-memory)
+- [ ] **Pagination** dla dużych zbiorów (> 1000 records)
+- [ ] **JOIN zamiast multiple queries** (unikaj N+1)
+- [ ] **NoLock dla read-only** (reporting/analytics)
+- [ ] **Indexed fields w WHERE** (gdy możliwe)
+- [ ] **TopCount dla "top N"** queries
+- [ ] **Tested z production data volume**
+
+---
+
+## 3.6 Porównanie: SQL vs FetchXML vs QueryExpression
+
+### Kiedy co używać - decision matrix
+
+| Scenariusz | SQL | FetchXML | QueryExpression |
+|------------|-----|----------|-----------------|
+| **C# Plugin** | ❌ | ✅ | ✅✅ (BEST) |
+| **JavaScript** | ❌ | ✅✅ (BEST) | ❌ |
+| **Power Automate** | ❌ | ✅✅ (BEST) | ❌ |
+| **Reporting** | ⚠️ (on-prem only) | ✅✅ (BEST) | ✅ |
+| **Charts** | ❌ | ✅✅ (BEST) | ❌ |
+| **Views** | ❌ | ✅✅ (BEST) | ❌ |
+| **Dashboards** | ❌ | ✅✅ (BEST) | ❌ |
+| **Aggregations** | ⚠️ | ✅✅ (BEST) | ⚠️ (limited) |
+| **Cross-entity** | ✅✅ | ✅✅ | ✅✅ |
+| **Type safety** | ❌ | ❌ | ✅✅ (BEST) |
+| **IntelliSense** | ❌ | ⚠️ (XML) | ✅✅ (BEST) |
+| **Cloud support** | ❌ | ✅✅ | ✅✅ |
+
+### Feature comparison
+
+| Feature | SQL | FetchXML | QueryExpression |
+|---------|-----|----------|-----------------|
+| **Basic filtering** | ✅ | ✅ | ✅ |
+| **JOIN** | ✅ | ✅ | ✅ |
+| **Aggregation** | ✅ | ✅ | ⚠️ Limited |
+| **Pagination** | ✅ | ✅ | ✅ |
+| **Distinct** | ✅ | ✅ | ✅ |
+| **SubQueries** | ✅ | ❌ | ❌ |
+| **UNION** | ✅ | ❌ | ❌ |
+| **Outer Apply** | ✅ | ✅ (via link) | ✅ (via link) |
+| **Date grouping** | ✅ | ✅ | ❌ |
+| **Visual designer** | ✅ (SSMS) | ✅ (Advanced Find) | ❌ |
+
+### Przykład: to samo query 3 sposoby
+
+**Zadanie:** Znajdź top 10 accounts (active) z revenue > 1M, posortowane po revenue (DESC)
+
+**SQL:**
+```sql
+SELECT TOP 10
+    a.accountid,
+    a.name,
+    a.revenue,
+    c.fullname AS primary_contact
+FROM
+    account a
+LEFT JOIN
+    contact c ON a.primarycontactid = c.contactid
+WHERE
+    a.statecode = 0
+    AND a.revenue > 1000000
+ORDER BY
+    a.revenue DESC
+```
+
+**FetchXML:**
+```xml
+<fetch top="10">
+    <entity name="account">
+        <attribute name="accountid" />
+        <attribute name="name" />
+        <attribute name="revenue" />
+        
+        <link-entity name="contact" from="contactid" to="primarycontactid" 
+                     link-type="outer" alias="pc">
+            <attribute name="fullname" />
+        </link-entity>
+        
+        <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="revenue" operator="gt" value="1000000" />
+        </filter>
+        
+        <order attribute="revenue" descending="true" />
+    </entity>
+</fetch>
+```
+
+**QueryExpression:**
+```csharp
+var query = new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet("accountid", "name", "revenue"),
+    TopCount = 10
+};
+
+var contactLink = query.AddLink(
+    "contact",
+    "primarycontactid",
+    "contactid",
+    JoinOperator.LeftOuter
+);
+contactLink.Columns = new ColumnSet("fullname");
+contactLink.EntityAlias = "pc";
+
+query.Criteria = new FilterExpression
+{
+    Conditions =
+    {
+        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
+        new ConditionExpression("revenue", ConditionOperator.GreaterThan, 1000000)
+    }
+};
+
+query.Orders.Add(new OrderExpression("revenue", OrderType.Descending));
+
+var results = service.RetrieveMultiple(query);
+```
+
+### Konwersja między formatami
+
+**FetchXML → QueryExpression:**
+
+```csharp
+// Online service to convert
+var request = new FetchXmlToQueryExpressionRequest
+{
+    FetchXml = fetchXml
+};
+
+var response = (FetchXmlToQueryExpressionResponse)service.Execute(request);
+QueryExpression query = response.Query;
+```
+
+**QueryExpression → FetchXML:**
+
+```csharp
+var request = new QueryExpressionToFetchXmlRequest
+{
+    Query = query
+};
+
+var response = (QueryExpressionToFetchXmlResponse)service.Execute(request);
+string fetchXml = response.FetchXml;
+```
+
+---
+
+## Ćwiczenia praktyczne
+
+### Ćwiczenie 1: Podstawy SQL (Junior)
+
+**Zadanie:** Napisz zapytania SQL dla poniższych scenariuszy:
+
+1. Wszystkie active accounts z revenue > 500,000
+2. Accounts utworzone w tym miesiącu
+3. Accounts z nazwą zawierającą "Contoso"
+4. Top 5 accounts po liczbie employees
+
+```sql
+-- Twoje rozwiązanie tutaj
+```
+
+### Ćwiczenie 2: FetchXML z JOIN (Mid)
+
+**Zadanie:** Stwórz FetchXML które:
+
+1. Pobiera accounts z ich primary contacts
+2. Filtruje: tylko accounts z revenue > 1M
+3. Filtruje linked: tylko contacts z email @contoso.com
+4. Sortuje po account revenue DESC
+
+```xml
+<!-- Twoje rozwiązanie tutaj -->
+```
+
+### Ćwiczenie 3: QueryExpression zaawansowany (Mid)
+
+**Zadanie:** Napisz QueryExpression które znajdzie:
+
+"Accounts utworzone w ostatnich 30 dniach, które NIE mają żadnych opportunities, posortowane po revenue DESC"
+
+```csharp
+// Twoje rozwiązanie tutaj
+var query = new QueryExpression("account")
+{
+    // TODO
+};
+```
+
+**Wymagania:**
+- Użyj date operator (Last30Days)
+- Użyj LEFT JOIN do opportunities
+- Filter: opportunity IS NULL
+- Pagination (50 per page)
+
+### Ćwiczenie 4: Optymalizacja (Senior)
+
+**Zadanie:** Zoptymalizuj poniższy kod:
+
+```csharp
+// ❌ Źle zoptymalizowany kod
+var accounts = service.RetrieveMultiple(new QueryExpression("account")
+{
+    ColumnSet = new ColumnSet(true)
+}).Entities;
+
+foreach (var account in accounts)
+{
+    var contactsQuery = new QueryExpression("contact")
+    {
+        ColumnSet = new ColumnSet(true),
+        Criteria = new FilterExpression
+        {
+            Conditions =
+            {
+                new ConditionExpression("parentcustomerid", ConditionOperator.Equal, account.Id)
+            }
+        }
+    };
+    
+    var contacts = service.RetrieveMultiple(contactsQuery);
+    
+    foreach (var contact in contacts.Entities)
+    {
+        // Process contact
+    }
+}
+```
+
+**Zoptymalizuj:**
+1. Usuń ColumnSet(true)
+2. Wyeliminuj N+1 queries
+3. Dodaj pagination
+4. Dodaj filtr na active tylko
+
+### Ćwiczenie 5: Real-world scenario (Senior)
+
+**Zadanie:** Dashboard sprzedażowy
+
+Stwórz zapytanie (FetchXML lub QueryExpression) które zwróci:
+
+**Dla każdego sales person:**
+- Imię i nazwisko
+- Liczba opportunities (open)
+- Suma estimated value
+- Średnia close probability
+- Najwcześniejsza estimated close date
+
+**Filtry:**
+- Tylko opportunities z estimated close date w następnych 90 dni
+- Tylko active opportunities
+- Posortowane po total estimated value DESC
+
+---
+
+## Checklist przed przejściem do Rozdziału 4
+
+### SQL Fundamentals
+- [ ] **Rozumiesz model relacyjny**
+  - [ ] Wiesz czym są tabele, wiersze, kolumny
+  - [ ] Rozumiesz klucze (primary, foreign)
+  - [ ] Znasz typy relacji (1:1, 1:N, N:N)
+  
+- [ ] **Opanowałeś SELECT**
+  - [ ] Potrafisz filtrować (WHERE)
+  - [ ] Umiesz sortować (ORDER BY)
+  - [ ] Rozumiesz agregacje (GROUP BY, HAVING)
+  
+- [ ] **Rozumiesz JOIN**
+  - [ ] Znasz różnicę INNER vs LEFT JOIN
+  - [ ] Potrafisz wizualizować join results
+  - [ ] Umiesz łączyć multiple tables
+
+### FetchXML
+- [ ] **Podstawowa składnia**
+  - [ ] Potrafisz stworzyć podstawowe query
+  - [ ] Rozumiesz element hierarchy
+  - [ ] Znasz wszystkie operatory
+  
+- [ ] **Filtry**
+  - [ ] Umiesz tworzyć AND/OR filters
+  - [ ] Rozumiesz nested filters
+  - [ ] Znasz date operators
+  
+- [ ] **Link-entity (JOIN)**
+  - [ ] Potrafisz łączyć encje
+  - [ ] Rozumiesz link-type differences
+  - [ ] Umiesz tworzyć nested links
+  
+- [ ] **Zaawansowane**
+  - [ ] Rozumiesz aggregations
+  - [ ] Potrafisz używać pagination
+  - [ ] Znasz distinct i top
+
+### QueryExpression
+- [ ] **Podstawy API**
+  - [ ] Potrafisz stworzyć query
+  - [ ] Rozumiesz ColumnSet
+  - [ ] Znasz all ConditionOperators
+  
+- [ ] **FilterExpression**
+  - [ ] Umiesz tworzyć filters
+  - [ ] Rozumiesz nested filters
+  - [ ] Potrafisz kombinować AND/OR
+  
+- [ ] **LinkEntity**
+  - [ ] Potrafisz dodawać joins
+  - [ ] Rozumiesz JoinOperator types
+  - [ ] Umiesz tworzyć nested links
+  
+- [ ] **Performance features**
+  - [ ] Znasz PageInfo
+  - [ ] Rozumiesz NoLock
+  - [ ] Używasz TopCount właściwie
+
+### Optimization
+- [ ] **Best practices**
+  - [ ] Zawsze określasz potrzebne kolumny
+  - [ ] Używasz pagination dla dużych zbiorów
+  - [ ] Filtrujesz w database, nie in-memory
+  - [ ] Unikasz N+1 queries
+  
+- [ ] **Performance awareness**
+  - [ ] Rozumiesz jak działają indeksy
+  - [ ] Wiesz kiedy używać NoLock
+  - [ ] Potrafisz zidentyfikować slow queries
+  - [ ] Umiesz użyć tracing do diagnostyki
+
+### Practical Skills
+- [ ] **Wybór metody**
+  - [ ] Wiesz kiedy SQL vs FetchXML vs QueryExpression
+  - [ ] Rozumiesz trade-offs każdej metody
+  
+- [ ] **Debugging**
+  - [ ] Potrafisz czytać Plugin Trace Logs
+  - [ ] Umiesz mierzyć query performance
+  
+- [ ] **Real-world scenarios**
+  - [ ] Ukończyłeś wszystkie 5 ćwiczeń
+  - [ ] Rozumiesz przykłady z rozdziału
+  - [ ] Potrafisz zastosować wiedzę w praktyce
+
+---
+
+## Podsumowanie rozdziału
+
+W tym rozdziale zgłębiłeś zapytania w Dynamics 365 na trzech poziomach:
+
+✅ **SQL Fundamentals** - Model relacyjny, JOIN, agregacje, subqueries  
+✅ **FetchXML** - XML query language, link-entity, aggregations, pagination  
+✅ **QueryExpression** - Type-safe C# API, FilterExpression, LinkEntity  
+✅ **Optimization** - Indeksy, best practices, performance tuning  
+✅ **Comparison** - Kiedy co używać, feature matrix  
+
+### Kluczowe wnioski:
+
+> 💡 **Wybieraj odpowiednią metodę** - C# plugins → QueryExpression, Reporting → FetchXML
+
+> 💡 **Zawsze optymalizuj** - Tylko potrzebne kolumny, pagination, filter w DB
+
+> 💡 **Unikaj N+1** - Jeden query z JOIN zamiast setki queries
+
+> 💡 **Rozumiej indeksy** - Filtruj po indexed fields gdy możliwe
+
+> 💡 **Testuj z production data** - Performance problems ujawniają się przy skali
+
+### Typowe pułapki:
+
+❌ **ColumnSet(true) lub <all-attributes />** - Drastycznie spowalnia  
+❌ **N+1 queries** - 1000x więcej round trips do DB  
+❌ **Brak pagination** - Memory overflow przy dużych zbiorach  
+❌ **Filter in-memory** - Przenosi niepotrzebne dane  
+❌ **Ignorowanie performance** - "Działa na dev" ≠ "Będzie działać na prod"  
+
+### Co dalej?
+
+W **Rozdziale 4** poznasz **Narzędzia deweloperskie** - Visual Studio, VS Code, XrmToolBox, Power Platform CLI, Git i wszystko co potrzebne do efektywnej pracy z Dynamics 365.
+
+---
+
